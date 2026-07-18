@@ -20,27 +20,21 @@ const DIRECTIONS: Direction[] = [
   [1, -1],
 ];
 
-const WORD_LISTS = [
-  [
-    "GENESIS", "EXODUS", "PSALMS", "GOSPEL", "FAITH", "GRACE", "PRAYER", "AMEN", "CROSS", "GLORY",
-    "BIBLE", "COVENANT", "KINGDOM", "WORSHIP", "HOLY", "SCRIPTURE", "SABBATH", "ALTAR", "BLESSING", "REVIVAL",
-  ],
-  [
-    "MOSES", "DAVID", "ABRAHAM", "PETER", "PAUL", "JOSEPH", "SAMUEL", "ELIJAH", "DANIEL", "RUTH",
-    "ESTHER", "JOSHUA", "ISAIAH", "JACOB", "MARY", "MARTHA", "SOLOMON", "TIMOTHY", "PHILIP", "NOAH",
-  ],
-  [
-    "BAPTISM", "TRINITY", "CHURCH", "HEAVEN", "ANGEL", "SPIRIT", "PRAISE", "MERCY", "TRUTH", "PEACE",
-    "HOPE", "LOVE", "JOY", "SALVATION", "FORGIVE", "HOLINESS", "ANOINT", "REVERE", "SERMON", "FASTING",
-  ],
-  [
-    "JORDAN", "GALILEE", "BETHEL", "SINAI", "EDEN", "ZION", "CALVARY", "JERICHO", "CANAAN", "JUDAH",
-    "BETHANY", "NAZARETH", "SAMARIA", "DAMASCUS", "EGYPT", "ISRAEL", "GILEAD", "HEBRON", "SHILOH", "GOSHEN",
-  ],
-  [
-    "WISDOM", "BLESSED", "TEMPLE", "PARDON", "SAVIOR", "REDEEM", "PROPHET", "DISCIPLE", "MANNA", "PSALM",
-    "PARABLE", "MIRACLE", "COMMAND", "JUSTICE", "KINDNESS", "HUMBLE", "COURAGE", "VICTORY", "PROMISE", "SERVANT",
-  ],
+const WORDS_PER_GAME = 20;
+const WORD_BANK = [
+  "ABRAHAM", "ADAM", "ALTAR", "AMEN", "ANGEL", "ANOINT", "APOSTLE", "ARK", "BAPTISM", "BARNABAS",
+  "BETHANY", "BETHEL", "BIBLE", "BLESSED", "BLESSING", "CALEB", "CALVARY", "CANAAN", "CHURCH", "COMMAND",
+  "COVENANT", "COURAGE", "CROSS", "DAMASCUS", "DANIEL", "DAVID", "DEBORAH", "DELIVER", "DISCIPLE", "EDEN",
+  "EGYPT", "ELIJAH", "ELISHA", "ESTHER", "EXODUS", "EZEKIEL", "FAITH", "FASTING", "FORGIVE", "GALILEE",
+  "GENESIS", "GIDEON", "GILEAD", "GLORY", "GOSHEN", "GOSPEL", "GRACE", "HANNAH", "HEAVEN", "HEBRON",
+  "HOLINESS", "HOLY", "HOPE", "HUMBLE", "ISAAC", "ISAIAH", "ISRAEL", "JACOB", "JERICHO", "JEREMIAH",
+  "JESUS", "JOHN", "JONAH", "JORDAN", "JOSEPH", "JOSHUA", "JOY", "JUDAH", "JUSTICE", "KINDNESS",
+  "KINGDOM", "LAZARUS", "LIGHT", "LOVE", "MANNA", "MARTHA", "MARY", "MERCY", "MIRACLE", "MOSES",
+  "NAOMI", "NAZARETH", "NOAH", "PARDON", "PARABLE", "PAUL", "PEACE", "PETER", "PHILIP", "PRAISE",
+  "PRAYER", "PROMISE", "PROPHET", "PSALM", "PSALMS", "REBEKAH", "REDEEM", "REVERE", "REVIVAL", "RUTH",
+  "SABBATH", "SALVATION", "SAMARIA", "SAMSON", "SAMUEL", "SARAH", "SAVIOR", "SCRIPTURE", "SERMON", "SERVANT",
+  "SHILOH", "SINAI", "SOLOMON", "SPIRIT", "STEPHEN", "TEMPLE", "TIMOTHY", "TRINITY", "TRUTH", "VICTORY",
+  "WISDOM", "WITNESS", "WORSHIP", "ZION",
 ];
 
 export const GRID_SIZE = 14;
@@ -136,8 +130,7 @@ function generateGrid(words: string[], random: RandomSource = Math.random): {
 
 function puzzleFromSeed(seed?: string) {
   const random = seed ? seededRandom(seed) : Math.random;
-  const listIndex = Math.floor(random() * WORD_LISTS.length);
-  const words = WORD_LISTS[listIndex];
+  const words = shuffle(WORD_BANK, random).slice(0, WORDS_PER_GAME);
   return {
     words,
     ...generateGrid(words, random),
