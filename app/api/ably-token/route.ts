@@ -22,6 +22,9 @@ export async function GET(request: NextRequest) {
     ttl: 60 * 60 * 1000,
     capability: JSON.stringify({
       "word-search:*": ["publish", "subscribe", "presence"],
+      "tic-tac-toe:*": ["publish", "subscribe", "presence"],
+      "memory-match:*": ["publish", "subscribe", "presence"],
+      "trivia-battle:*": ["publish", "subscribe", "presence"],
     }),
   });
 

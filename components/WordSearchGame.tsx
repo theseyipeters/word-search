@@ -285,7 +285,7 @@ export function WordSearchGame({ roomId }: WordSearchGameProps) {
 
   const handleNewGame = useCallback(() => {
     if (isMultiplayer) {
-      router.push(`/room/${createRoomId()}`);
+      router.push(`/word-search/room/${createRoomId()}`);
       return;
     }
     newGame();
@@ -293,7 +293,7 @@ export function WordSearchGame({ roomId }: WordSearchGameProps) {
   }, [isMultiplayer, newGame, reset, router]);
 
   const handleCreateRoom = useCallback(() => {
-    router.push(`/room/${createRoomId()}`);
+    router.push(`/word-search/room/${createRoomId()}`);
   }, [router]);
 
   const handleCopyInvite = useCallback(async () => {
