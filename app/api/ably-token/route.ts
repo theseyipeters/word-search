@@ -24,6 +24,7 @@ export async function GET(request: NextRequest) {
       "word-search:*": ["publish", "subscribe", "presence"],
       "tic-tac-toe:*": ["publish", "subscribe", "presence"],
       "memory-match:*": ["publish", "subscribe", "presence"],
+      "trivia-battle:*": ["publish", "subscribe", "presence"],
     }),
   });
 

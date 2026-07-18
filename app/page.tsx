@@ -19,6 +19,12 @@ const games = [
     status: "Multiplayer",
     description: "Flip cards, find pairs, and race for the highest score.",
   },
+  {
+    title: "Trivia Battle",
+    href: "/trivia-battle",
+    status: "AI Powered",
+    description: "Answer Bible questions, earn speed bonuses, and climb the leaderboard.",
+  },
 ];
 
 export default function Home() {
