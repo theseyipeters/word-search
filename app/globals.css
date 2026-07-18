@@ -45,7 +45,7 @@
 }
 
 body {
-  font-family: var(--font-jost), 'Jost', sans-serif;
+  font-family: var(--font-oxygen), 'Oxygen', sans-serif;
   background: var(--bg);
   color: var(--text);
   min-height: 100dvh;
