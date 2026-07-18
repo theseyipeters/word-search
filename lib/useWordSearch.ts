@@ -21,25 +21,72 @@ const DIRECTIONS: Direction[] = [
 ];
 
 const WORD_LISTS = [
-  ["GENESIS", "EXODUS", "PSALMS", "GOSPEL", "FAITH", "GRACE", "PRAYER", "AMEN", "CROSS", "GLORY"],
-  ["MOSES", "DAVID", "ABRAHAM", "PETER", "PAUL", "JOSEPH", "SAMUEL", "ELIJAH", "DANIEL", "RUTH"],
-  ["BAPTISM", "TRINITY", "CHURCH", "HEAVEN", "ANGEL", "SPIRIT", "PRAISE", "MERCY", "TRUTH", "PEACE"],
-  ["JORDAN", "GALILEE", "BETHEL", "SINAI", "EDEN", "ZION", "CALVARY", "JERICHO", "CANAAN", "JUDAH"],
-  ["WISDOM", "BLESSED", "TEMPLE", "PARDON", "SAVIOR", "REDEEM", "PROPHET", "DISCIPLE", "MANNA", "PSALM"],
+  [
+    "GENESIS", "EXODUS", "PSALMS", "GOSPEL", "FAITH", "GRACE", "PRAYER", "AMEN", "CROSS", "GLORY",
+    "BIBLE", "COVENANT", "KINGDOM", "WORSHIP", "HOLY", "SCRIPTURE", "SABBATH", "ALTAR", "BLESSING", "REVIVAL",
+  ],
+  [
+    "MOSES", "DAVID", "ABRAHAM", "PETER", "PAUL", "JOSEPH", "SAMUEL", "ELIJAH", "DANIEL", "RUTH",
+    "ESTHER", "JOSHUA", "ISAIAH", "JACOB", "MARY", "MARTHA", "SOLOMON", "TIMOTHY", "PHILIP", "NOAH",
+  ],
+  [
+    "BAPTISM", "TRINITY", "CHURCH", "HEAVEN", "ANGEL", "SPIRIT", "PRAISE", "MERCY", "TRUTH", "PEACE",
+    "HOPE", "LOVE", "JOY", "SALVATION", "FORGIVE", "HOLINESS", "ANOINT", "REVERE", "SERMON", "FASTING",
+  ],
+  [
+    "JORDAN", "GALILEE", "BETHEL", "SINAI", "EDEN", "ZION", "CALVARY", "JERICHO", "CANAAN", "JUDAH",
+    "BETHANY", "NAZARETH", "SAMARIA", "DAMASCUS", "EGYPT", "ISRAEL", "GILEAD", "HEBRON", "SHILOH", "GOSHEN",
+  ],
+  [
+    "WISDOM", "BLESSED", "TEMPLE", "PARDON", "SAVIOR", "REDEEM", "PROPHET", "DISCIPLE", "MANNA", "PSALM",
+    "PARABLE", "MIRACLE", "COMMAND", "JUSTICE", "KINDNESS", "HUMBLE", "COURAGE", "VICTORY", "PROMISE", "SERVANT",
+  ],
 ];
 
-const GRID_SIZE = 14;
+export const GRID_SIZE = 14;
 
-function shuffle<T>(arr: T[]): T[] {
+type RandomSource = () => number;
+
+type WordSearchOptions = {
+  seed?: string;
+  onWordFound?: (word: string) => void;
+  foundByLabel?: string;
+};
+
+function hashSeed(seed: string): number {
+  let hash = 2166136261;
+  for (let i = 0; i < seed.length; i++) {
+    hash ^= seed.charCodeAt(i);
+    hash = Math.imul(hash, 16777619);
+  }
+  return hash >>> 0;
+}
+
+function seededRandom(seed: string): RandomSource {
+  let state = hashSeed(seed) || 1;
+  return () => {
+    state = Math.imul(1664525, state) + 1013904223;
+    return (state >>> 0) / 4294967296;
+  };
+}
+
+export function createRoomId() {
+  if (typeof crypto !== "undefined" && "randomUUID" in crypto) {
+    return crypto.randomUUID().slice(0, 8);
+  }
+  return Math.random().toString(36).slice(2, 10);
+}
+
+function shuffle<T>(arr: T[], random: RandomSource = Math.random): T[] {
   const a = [...arr];
   for (let i = a.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
+    const j = Math.floor(random() * (i + 1));
     [a[i], a[j]] = [a[j], a[i]];
   }
   return a;
 }
 
-function generateGrid(words: string[]): {
+function generateGrid(words: string[], random: RandomSource = Math.random): {
   grid: string[][];
   placed: PlacedWord[];
 } {
@@ -52,14 +99,15 @@ function generateGrid(words: string[]): {
 
   for (const word of sorted) {
     let didPlace = false;
-    const dirs = shuffle(DIRECTIONS);
+    const dirs = shuffle(DIRECTIONS, random);
 
     for (const dir of dirs) {
       const positions = shuffle(
         Array.from({ length: GRID_SIZE * GRID_SIZE }, (_, i) => ({
           row: Math.floor(i / GRID_SIZE),
           col: i % GRID_SIZE,
-        }))
+        })),
+        random
       );
 
       for (const start of positions) {
@@ -78,12 +126,22 @@ function generateGrid(words: string[]): {
   for (let r = 0; r < GRID_SIZE; r++) {
     for (let c = 0; c < GRID_SIZE; c++) {
       if (!grid[r][c]) {
-        grid[r][c] = alphabet[Math.floor(Math.random() * 26)];
+        grid[r][c] = alphabet[Math.floor(random() * 26)];
       }
     }
   }
 
   return { grid, placed };
+}
+
+function puzzleFromSeed(seed?: string) {
+  const random = seed ? seededRandom(seed) : Math.random;
+  const listIndex = Math.floor(random() * WORD_LISTS.length);
+  const words = WORD_LISTS[listIndex];
+  return {
+    words,
+    ...generateGrid(words, random),
+  };
 }
 
 function canPlace(
@@ -143,13 +201,12 @@ function getCellsBetween(start: Position, end: Position): Position[] | null {
   return cells;
 }
 
-export function useWordSearch() {
-  const wordListRef = useRef(WORD_LISTS[Math.floor(Math.random() * WORD_LISTS.length)]);
-  const [{ grid, placed }, setGridData] = useState(() =>
-    generateGrid(wordListRef.current)
-  );
+export function useWordSearch(options: WordSearchOptions = {}) {
+  const seedRef = useRef(options.seed);
+  const [puzzle, setPuzzle] = useState(() => puzzleFromSeed(seedRef.current));
   const [foundWords, setFoundWords] = useState<Set<string>>(new Set());
   const [foundCells, setFoundCells] = useState<Set<string>>(new Set());
+  const [foundBy, setFoundBy] = useState<Record<string, string>>({});
   const [selecting, setSelecting] = useState(false);
   const [selStart, setSelStart] = useState<Position | null>(null);
   const [selEnd, setSelEnd] = useState<Position | null>(null);
@@ -157,7 +214,36 @@ export function useWordSearch() {
   const [lastFoundCells, setLastFoundCells] = useState<Set<string>>(new Set());
   const [showLastFound, setShowLastFound] = useState(false);
 
-  const words = wordListRef.current;
+  const { grid, placed, words } = puzzle;
+
+  const markWordFound = useCallback(
+    (word: string, foundByLabel = options.foundByLabel) => {
+      const placedWord = placed.find((pw) => pw.word === word);
+      if (!placedWord) return false;
+      if (foundWords.has(word)) return false;
+
+      const nextFoundWords = new Set(foundWords);
+      nextFoundWords.add(word);
+      setFoundWords(nextFoundWords);
+
+      const justFound = new Set<string>();
+      const nextFoundCells = new Set(foundCells);
+      placedWord.cells.forEach((c) => {
+        const k = posKey(c);
+        nextFoundCells.add(k);
+        justFound.add(k);
+      });
+      setFoundCells(nextFoundCells);
+      setFoundBy((current) =>
+        foundByLabel ? { ...current, [word]: foundByLabel } : current
+      );
+      setLastFoundCells(justFound);
+      setShowLastFound(true);
+      setTimeout(() => setShowLastFound(false), 600);
+      return true;
+    },
+    [foundCells, foundWords, options.foundByLabel, placed]
+  );
 
   const startSelect = useCallback((pos: Position) => {
     setSelecting(true);
@@ -195,21 +281,9 @@ export function useWordSearch() {
           !foundWords.has(pw.word) &&
           (pw.word === selectedWord || pw.word === reversedWord)
         ) {
-          const newFoundWords = new Set(foundWords);
-          newFoundWords.add(pw.word);
-          setFoundWords(newFoundWords);
-
-          const newFoundCells = new Set(foundCells);
-          const justFound = new Set<string>();
-          pw.cells.forEach((c) => {
-            const k = posKey(c);
-            newFoundCells.add(k);
-            justFound.add(k);
-          });
-          setFoundCells(newFoundCells);
-          setLastFoundCells(justFound);
-          setShowLastFound(true);
-          setTimeout(() => setShowLastFound(false), 600);
+          if (markWordFound(pw.word)) {
+            options.onWordFound?.(pw.word);
+          }
           break;
         }
       }
@@ -219,13 +293,14 @@ export function useWordSearch() {
     setSelStart(null);
     setSelEnd(null);
     setSelectedCells(new Set());
-  }, [selecting, selStart, selEnd, grid, placed, foundWords, foundCells]);
+  }, [selecting, selStart, selEnd, grid, placed, foundWords, markWordFound, options]);
 
   const newGame = useCallback(() => {
-    wordListRef.current = WORD_LISTS[Math.floor(Math.random() * WORD_LISTS.length)];
-    setGridData(generateGrid(wordListRef.current));
+    seedRef.current = undefined;
+    setPuzzle(puzzleFromSeed());
     setFoundWords(new Set());
     setFoundCells(new Set());
+    setFoundBy({});
     setSelectedCells(new Set());
     setSelecting(false);
     setSelStart(null);
@@ -252,6 +327,7 @@ export function useWordSearch() {
     placed,
     foundWords,
     foundCells,
+    foundBy,
     selectedCells,
     selecting,
     isComplete,
@@ -259,6 +335,7 @@ export function useWordSearch() {
     moveSelect,
     endSelect,
     newGame,
+    markWordFound,
     getSelectionLine,
     lastFoundCells,
     showLastFound,
