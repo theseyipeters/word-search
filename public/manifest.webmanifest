@@ -1,0 +1,42 @@
+{
+  "name": "Bible Games Hub",
+  "short_name": "Bible Games",
+  "description": "Play multiplayer Bible-inspired games including Word Search, Tic Tac Toe, Memory Match, and AI-powered Trivia Battle.",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#ffffff",
+  "theme_color": "#0a0a0a",
+  "categories": ["games", "education", "entertainment"],
+  "icons": [
+    {
+      "src": "/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "Trivia Battle",
+      "short_name": "Trivia",
+      "description": "Start a Bible trivia battle.",
+      "url": "/trivia-battle",
+      "icons": [{ "src": "/icon-192.png", "sizes": "192x192" }]
+    },
+    {
+      "name": "Word Search",
+      "short_name": "Words",
+      "description": "Start a Bible word search.",
+      "url": "/word-search",
+      "icons": [{ "src": "/icon-192.png", "sizes": "192x192" }]
+    }
+  ]
+}

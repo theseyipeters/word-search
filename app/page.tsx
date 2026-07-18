@@ -1,4 +1,11 @@
 import Link from "next/link";
+import type { Metadata } from "next";
+
+export const metadata: Metadata = {
+  title: "Multiplayer Bible Games",
+  description:
+    "Choose from multiplayer Bible-inspired games: Word Search, Tic Tac Toe, Memory Match, and AI-powered Trivia Battle.",
+};
 
 const games = [
   {
