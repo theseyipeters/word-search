@@ -7,13 +7,14 @@ import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
-  createRoomId,
+  createRoomCode,
   GRID_SIZE,
   useWordSearch,
   type Position,
 } from "@/lib/useWordSearch";
 import { useTheme } from "@/lib/useTheme";
 import { useTimer } from "@/lib/useTimer";
+import { RoomJoinForm } from "./RoomJoinForm";
 import ui from "./WordSearchGame.module.css";
 
 type WordSearchGameProps = {
@@ -358,7 +359,7 @@ export function WordSearchGame({ roomId }: WordSearchGameProps) {
 
   const handleNewGame = useCallback(() => {
     if (isMultiplayer) {
-      const nextRoomId = createRoomId();
+      const nextRoomId = createRoomCode();
       const roomPlayer = getOrCreatePlayer();
       sessionStorage.setItem(`word-search-room-host:${nextRoomId}`, roomPlayer.id);
       router.push(`/word-search/room/${nextRoomId}`);
@@ -369,7 +370,7 @@ export function WordSearchGame({ roomId }: WordSearchGameProps) {
   }, [isMultiplayer, newGame, reset, router]);
 
   const handleCreateRoom = useCallback(() => {
-    const nextRoomId = createRoomId();
+    const nextRoomId = createRoomCode();
     const roomPlayer = getOrCreatePlayer();
     sessionStorage.setItem(`word-search-room-host:${nextRoomId}`, roomPlayer.id);
     router.push(`/word-search/room/${nextRoomId}`);
@@ -594,7 +595,7 @@ export function WordSearchGame({ roomId }: WordSearchGameProps) {
               <p>
                 {isSingleSetup
                   ? "You’ll have 20 hidden Bible words to find. Your timer begins as soon as you start."
-                  : "Create a private room, invite your friends, and begin once every player is ready."}
+                  : "Create a private room or join one with a four-digit code, then begin once every player is ready."}
               </p>
               <div className={ui.setupDetails}>
                 <span><strong>20</strong> hidden words</span>
@@ -609,6 +610,7 @@ export function WordSearchGame({ roomId }: WordSearchGameProps) {
                 {isSingleSetup ? "Start game" : "Create room"}
                 <span aria-hidden="true">→</span>
               </button>
+              {!isSingleSetup && <RoomJoinForm gamePath="/word-search" />}
             </div>
 
             <div className={ui.setupArt} aria-hidden="true">

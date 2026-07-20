@@ -62,7 +62,7 @@ export default function Home() {
       <header className={styles.nav}>
         <Link href="/" className={styles.logoLink} aria-label="Guidde games home">
           <Image
-            src="/guidde2.svg"
+            src="/guidde3.svg"
             alt="Guidde"
             width={230}
             height={79}
@@ -76,7 +76,7 @@ export default function Home() {
         </div>
       </header>
 
-      <section className={styles.hero} aria-labelledby="home-title">
+      {/* <section className={styles.hero} aria-labelledby="home-title">
         <div className={styles.heroCopy}>
           <p className={styles.eyebrow}>Bible games for everyone</p>
           <h1 id="home-title">
@@ -120,7 +120,7 @@ export default function Home() {
             <span className={styles.roundArrow} aria-hidden="true">↗</span>
           </div>
         </Link>
-      </section>
+      </section> */}
 
       <section className={styles.gamesSection} id="games" aria-labelledby="games-title">
         <div className={styles.sectionHeading}>

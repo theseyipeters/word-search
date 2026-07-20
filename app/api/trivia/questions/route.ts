@@ -1,282 +1,152 @@
 import { NextResponse, type NextRequest } from "next/server";
 
 export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
 
 type TriviaQuestion = {
   question: string;
   options: string[];
   correctIndex: number;
   reference: string;
-  kind?: string;
+  kind: string;
 };
 type Difficulty = "easy" | "normal" | "hard";
+type QuestionPayload = {
+  questions: TriviaQuestion[];
+  source: "ai";
+  model: string;
+};
+type QuestionRequest = {
+  roomId?: unknown;
+  difficulty?: unknown;
+  exclude?: unknown;
+};
 
-const fallbackQuestions: TriviaQuestion[] = [
-  {
-    question: "Who led the Israelites out of Egypt?",
-    options: ["David", "Moses", "Solomon", "Elijah"],
-    correctIndex: 1,
-    reference: "Exodus",
-  },
-  {
-    question: "What did David use to defeat Goliath?",
-    options: ["A sword", "A spear", "A sling and stone", "A bow"],
-    correctIndex: 2,
-    reference: "1 Samuel 17",
-  },
-  {
-    question: "Who was swallowed by a great fish?",
-    options: ["Jonah", "Noah", "Peter", "Joseph"],
-    correctIndex: 0,
-    reference: "Jonah 1",
-  },
-  {
-    question: "Where was Jesus born?",
-    options: ["Nazareth", "Bethlehem", "Jerusalem", "Capernaum"],
-    correctIndex: 1,
-    reference: "Luke 2",
-  },
-  {
-    question: "Who built the ark?",
-    options: ["Abraham", "Moses", "Noah", "Jacob"],
-    correctIndex: 2,
-    reference: "Genesis 6",
-  },
-  {
-    question: "Which disciple denied Jesus three times?",
-    options: ["John", "Thomas", "Peter", "Andrew"],
-    correctIndex: 2,
-    reference: "Luke 22",
-  },
-  {
-    question: "What is the first book of the Bible?",
-    options: ["Exodus", "Genesis", "Matthew", "Psalms"],
-    correctIndex: 1,
-    reference: "Genesis",
-  },
-  {
-    question: "Who interpreted Pharaoh's dreams in Egypt?",
-    options: ["Joseph", "Daniel", "Samuel", "Isaiah"],
-    correctIndex: 0,
-    reference: "Genesis 41",
-  },
-  {
-    question: "How many days was Jesus in the wilderness being tempted?",
-    options: ["7", "12", "30", "40"],
-    correctIndex: 3,
-    reference: "Matthew 4",
-  },
-  {
-    question: "Who was the mother of Jesus?",
-    options: ["Martha", "Mary", "Elizabeth", "Ruth"],
-    correctIndex: 1,
-    reference: "Matthew 1",
-  },
-  {
-    question: "Who said, \"Here am I; send me\"?",
-    options: ["Isaiah", "Jeremiah", "Samuel", "Ezekiel"],
-    correctIndex: 0,
-    reference: "Isaiah 6:8",
-    kind: "who-said-it",
-  },
-  {
-    question: "Fill in the gap: \"The Lord is my ______; I shall not want.\"",
-    options: ["shield", "shepherd", "light", "song"],
-    correctIndex: 1,
-    reference: "Psalm 23:1",
-    kind: "fill-gap",
-  },
-  {
-    question: "Which event happened first?",
-    options: ["The Red Sea parted", "David became king", "Daniel entered the lions' den", "Jesus fed five thousand"],
-    correctIndex: 0,
-    reference: "Exodus 14",
-    kind: "sequence",
-  },
-  {
-    question: "Who said, \"Am I my brother's keeper?\"",
-    options: ["Cain", "Esau", "Joseph", "Absalom"],
-    correctIndex: 0,
-    reference: "Genesis 4:9",
-    kind: "who-said-it",
-  },
-  {
-    question: "Fill in the gap: Zacchaeus climbed a ______ tree to see Jesus.",
-    options: ["fig", "olive", "sycamore", "cedar"],
-    correctIndex: 2,
-    reference: "Luke 19:4",
-    kind: "fill-gap",
-  },
-  {
-    question: "Which Bible occurrence involved fire falling from heaven on an altar?",
-    options: ["Elijah on Mount Carmel", "Moses at Sinai", "Gideon's fleece", "Jacob at Bethel"],
-    correctIndex: 0,
-    reference: "1 Kings 18",
-    kind: "occurrence",
-  },
-  {
-    question: "Who said, \"Speak, Lord, for your servant is listening\"?",
-    options: ["Samuel", "Saul", "Solomon", "Nathan"],
-    correctIndex: 0,
-    reference: "1 Samuel 3:10",
-    kind: "who-said-it",
-  },
-  {
-    question: "Fill in the gap: Jesus said, \"I am the way, the ______ and the life.\"",
-    options: ["truth", "gate", "vine", "bread"],
-    correctIndex: 0,
-    reference: "John 14:6",
-    kind: "fill-gap",
-  },
-  {
-    question: "Which event happened at Pentecost?",
-    options: ["The Spirit came on the believers", "The temple was rebuilt", "Paul was shipwrecked", "Jericho's walls fell"],
-    correctIndex: 0,
-    reference: "Acts 2",
-    kind: "occurrence",
-  },
-  {
-    question: "Who asked, \"What must I do to inherit eternal life?\"",
-    options: ["A rich ruler", "Nicodemus", "Pilate", "Barnabas"],
-    correctIndex: 0,
-    reference: "Luke 18:18",
-    kind: "who-said-it",
-  },
-];
-const hardFallbackQuestions: TriviaQuestion[] = [
-  {
-    question: "Who said, \"Is your servant a dog, that he should do this great thing?\"",
-    options: ["Hazael", "Jehu", "Naaman", "Ben-Hadad"],
-    correctIndex: 0,
-    reference: "2 Kings 8:13",
-    kind: "who-said-it",
-  },
-  {
-    question: "Fill in the gap: Eutychus fell from the ______ story while Paul was speaking.",
-    options: ["second", "third", "fourth", "upper"],
-    correctIndex: 1,
-    reference: "Acts 20:9",
-    kind: "fill-gap",
-  },
-  {
-    question: "Which occurrence involved a borrowed axe head floating?",
-    options: ["Elisha by the Jordan", "Elijah at Cherith", "Moses at Marah", "Joshua at Ai"],
-    correctIndex: 0,
-    reference: "2 Kings 6:1-7",
-    kind: "occurrence",
-  },
-  {
-    question: "Who was the father of Tola, the judge of Israel?",
-    options: ["Puah", "Gilead", "Abdon", "Hillel"],
-    correctIndex: 0,
-    reference: "Judges 10:1",
-    kind: "person-identity",
-  },
-  {
-    question: "Who said, \"Come, see my zeal for the Lord\"?",
-    options: ["Jehu", "Josiah", "Hezekiah", "Elijah"],
-    correctIndex: 0,
-    reference: "2 Kings 10:16",
-    kind: "who-said-it",
-  },
-  {
-    question: "Fill in the gap: Paul left Trophimus sick at ______.",
-    options: ["Miletus", "Troas", "Corinth", "Crete"],
-    correctIndex: 0,
-    reference: "2 Timothy 4:20",
-    kind: "fill-gap",
-  },
-  {
-    question: "Which event happened first in David's life?",
-    options: ["He spared Saul in a cave", "He brought the ark to Jerusalem", "He defeated Goliath", "He fled from Absalom"],
-    correctIndex: 2,
-    reference: "1 Samuel 17",
-    kind: "sequence",
-  },
-  {
-    question: "Which prophet named his son Maher-Shalal-Hash-Baz?",
-    options: ["Isaiah", "Jeremiah", "Hosea", "Ezekiel"],
-    correctIndex: 0,
-    reference: "Isaiah 8:3",
-    kind: "person-identity",
-  },
-  {
-    question: "Where did Paul reason daily in the school of Tyrannus?",
-    options: ["Ephesus", "Athens", "Corinth", "Philippi"],
-    correctIndex: 0,
-    reference: "Acts 19:9",
-    kind: "location",
-  },
-  {
-    question: "Which Bible occurrence involved Agabus binding his own hands and feet?",
-    options: ["A prophecy about Paul's arrest", "A famine prophecy", "A warning to Peter", "A vision in Joppa"],
-    correctIndex: 0,
-    reference: "Acts 21:10-11",
-    kind: "occurrence",
-  },
+const QUESTIONS_PER_BATTLE = 10;
+const CANDIDATES_PER_GENERATION = 16;
+const MAX_CLIENT_HISTORY = 400;
+const MAX_PROMPT_HISTORY = 100;
+const MAX_SERVER_HISTORY = 1000;
+const DEFAULT_MODEL = "gpt-5.6-luna";
+
+const questionCache = new Map<string, QuestionPayload>();
+const generationInFlight = new Map<string, Promise<QuestionPayload>>();
+const recentQuestionSignatures: string[] = [];
+
+const coverageGroups = [
+  "Torah and the wilderness: Genesis, Exodus, Leviticus, Numbers, Deuteronomy",
+  "Israel's history: Joshua, Judges, Ruth, Samuel, Kings, Chronicles, Ezra, Nehemiah, Esther",
+  "Wisdom and poetry: Job, Psalms, Proverbs, Ecclesiastes, Song of Songs",
+  "Major prophets: Isaiah, Jeremiah, Lamentations, Ezekiel, Daniel",
+  "Minor prophets: Hosea through Malachi",
+  "Jesus' life and teaching: Matthew, Mark, Luke, John",
+  "The early church: Acts and the New Testament letters",
+  "New Testament people, places, journeys, parables, miracles, and events",
 ];
 
-const questionCache = new Map<string, TriviaQuestion[]>();
-const usedQuestionSignatures = new Set<string>();
+function normalizeDifficulty(value: unknown): Difficulty {
+  return value === "easy" || value === "hard" ? value : "normal";
+}
 
-function questionSignature(question: Pick<TriviaQuestion, "question">) {
-  return question.question
+function cleanRoomId(value: unknown) {
+  return typeof value === "string" && value.trim()
+    ? value.trim().slice(0, 80)
+    : "solo";
+}
+
+function questionSignature(question: Pick<TriviaQuestion, "question"> | string) {
+  const value = typeof question === "string" ? question : question.question;
+  return value
     .toLowerCase()
-    .replace(/["'.,?!:;()\[\]]/g, "")
+    .replace(/["'.,?!:;()\[\]{}]/g, "")
     .replace(/\s+/g, " ")
     .trim();
 }
 
-function uniqueQuestions(questions: TriviaQuestion[]) {
-  const seen = new Set<string>();
-  const unique: TriviaQuestion[] = [];
+function questionTokens(value: string) {
+  const ignored = new Set([
+    "a", "an", "and", "are", "at", "did", "do", "does", "fill", "for",
+    "from", "gap", "happened", "how", "in", "is", "of", "on", "the",
+    "this", "to", "was", "what", "when", "where", "which", "who", "why",
+  ]);
+  return new Set(
+    questionSignature(value)
+      .split(" ")
+      .filter((token) => token.length > 2 && !ignored.has(token))
+  );
+}
 
+function questionsAreSimilar(first: string, second: string) {
+  const firstSignature = questionSignature(first);
+  const secondSignature = questionSignature(second);
+  if (firstSignature === secondSignature) return true;
+
+  const firstTokens = questionTokens(firstSignature);
+  const secondTokens = questionTokens(secondSignature);
+  if (Math.min(firstTokens.size, secondTokens.size) < 3) return false;
+
+  let overlap = 0;
+  firstTokens.forEach((token) => {
+    if (secondTokens.has(token)) overlap += 1;
+  });
+  return overlap / Math.min(firstTokens.size, secondTokens.size) >= 0.78;
+}
+
+function uniqueFreshQuestions(
+  candidates: TriviaQuestion[],
+  excludedQuestions: string[]
+) {
+  const accepted: TriviaQuestion[] = [];
+  const comparisonPool = [...excludedQuestions, ...recentQuestionSignatures];
+
+  for (const candidate of candidates) {
+    if (
+      comparisonPool.some((previous) =>
+        questionsAreSimilar(candidate.question, previous)
+      ) ||
+      accepted.some((previous) =>
+        questionsAreSimilar(candidate.question, previous.question)
+      )
+    ) continue;
+    accepted.push(candidate);
+  }
+
+  return accepted;
+}
+
+function rememberQuestions(questions: TriviaQuestion[]) {
   for (const question of questions) {
-    const signature = questionSignature(question);
-    if (!signature || seen.has(signature)) continue;
-    seen.add(signature);
-    unique.push(question);
+    recentQuestionSignatures.push(questionSignature(question));
   }
-
-  return unique;
-}
-
-function fallbackSet(roomId: string) {
-  return fallbackSetForDifficulty(roomId, "normal");
-}
-
-function normalizeDifficulty(value: string | null): Difficulty {
-  return value === "easy" || value === "hard" ? value : "normal";
-}
-
-function difficultyGuidance(difficulty: Difficulty) {
-  if (difficulty === "easy") {
-    return "Easy difficulty: use familiar Bible stories, well-known people, direct wording, and clearly distinct distractors. Avoid obscure names or rare references.";
+  if (recentQuestionSignatures.length > MAX_SERVER_HISTORY) {
+    recentQuestionSignatures.splice(
+      0,
+      recentQuestionSignatures.length - MAX_SERVER_HISTORY
+    );
   }
-
-  if (difficulty === "hard") {
-    return "Hard difficulty: use deeper Bible knowledge, lesser-known events, exact speakers, subtle sequence questions, obscure-but-fair references, and highly plausible distractors. Avoid giveaway wording.";
-  }
-
-  return "Normal difficulty: mix familiar and moderately challenging Bible knowledge with fair but plausible distractors.";
 }
 
-function fallbackSetForDifficulty(roomId: string, difficulty: Difficulty) {
-  const source =
-    difficulty === "hard"
-      ? hardFallbackQuestions
-      : difficulty === "easy"
-        ? fallbackQuestions.slice(0, 14)
-        : fallbackQuestions;
-  const start = Math.abs(
-    [...roomId].reduce((total, char) => total + char.charCodeAt(0), 0)
-  ) % source.length;
-  const rotated = [
-    ...source.slice(start),
-    ...source.slice(0, start),
-  ];
+function isTriviaQuestion(value: unknown): value is TriviaQuestion {
+  if (!value || typeof value !== "object") return false;
+  const question = value as Partial<TriviaQuestion>;
 
-  return uniqueQuestions(rotated).slice(0, 10);
+  return (
+    typeof question.question === "string" &&
+    question.question.trim().length >= 12 &&
+    Array.isArray(question.options) &&
+    question.options.length === 4 &&
+    question.options.every(
+      (option) => typeof option === "string" && option.trim().length > 0
+    ) &&
+    new Set(question.options.map((option) => option.toLowerCase().trim())).size === 4 &&
+    Number.isInteger(question.correctIndex) &&
+    Number(question.correctIndex) >= 0 &&
+    Number(question.correctIndex) <= 3 &&
+    typeof question.reference === "string" &&
+    question.reference.trim().length > 0 &&
+    typeof question.kind === "string" &&
+    question.kind.trim().length > 0
+  );
 }
 
 function extractResponseText(payload: Record<string, unknown>) {
@@ -299,27 +169,73 @@ function extractResponseText(payload: Record<string, unknown>) {
     .join("");
 }
 
-function isValidQuestion(value: unknown): value is TriviaQuestion {
-  if (!value || typeof value !== "object") return false;
-  const question = value as Partial<TriviaQuestion>;
-
-  return (
-    typeof question.question === "string" &&
-    Array.isArray(question.options) &&
-    question.options.length === 4 &&
-    question.options.every((option) => typeof option === "string") &&
-    typeof question.correctIndex === "number" &&
-    question.correctIndex >= 0 &&
-    question.correctIndex <= 3 &&
-    typeof question.reference === "string"
-  );
+function seededNumber(seed: string) {
+  let value = 2166136261;
+  for (const char of seed) {
+    value ^= char.charCodeAt(0);
+    value = Math.imul(value, 16777619);
+  }
+  return Math.abs(value >>> 0);
 }
 
-async function generateQuestions(roomId: string, difficulty: Difficulty): Promise<TriviaQuestion[]> {
-  const apiKey = process.env.OPENAI_API_KEY;
-  if (!apiKey) return fallbackSetForDifficulty(roomId, difficulty);
-  const avoidList = [...usedQuestionSignatures].slice(-80);
+function coverageBrief(seed: string) {
+  const start = seededNumber(seed) % coverageGroups.length;
+  return [0, 1, 3, 5]
+    .map((offset) => coverageGroups[(start + offset) % coverageGroups.length])
+    .join("\n- ");
+}
 
+function difficultyGuidance(difficulty: Difficulty) {
+  if (difficulty === "easy") {
+    return "Use familiar stories, well-known people, direct wording, and clearly distinct distractors. Avoid obscure names and trick questions.";
+  }
+  if (difficulty === "hard") {
+    return "Use deeper but verifiable Bible knowledge, lesser-known events, exact speakers, sequence, locations, and plausible distractors. Questions must remain fair.";
+  }
+  return "Mix familiar and moderately challenging Bible knowledge with direct wording and plausible distractors.";
+}
+
+function questionSchema() {
+  return {
+    type: "object",
+    additionalProperties: false,
+    properties: {
+      questions: {
+        type: "array",
+        minItems: CANDIDATES_PER_GENERATION,
+        maxItems: CANDIDATES_PER_GENERATION,
+        items: {
+          type: "object",
+          additionalProperties: false,
+          properties: {
+            question: { type: "string" },
+            options: {
+              type: "array",
+              minItems: 4,
+              maxItems: 4,
+              items: { type: "string" },
+            },
+            correctIndex: { type: "integer", minimum: 0, maximum: 3 },
+            reference: { type: "string" },
+            kind: { type: "string" },
+          },
+          required: ["question", "options", "correctIndex", "reference", "kind"],
+        },
+      },
+    },
+    required: ["questions"],
+  };
+}
+
+async function requestCandidateBatch(
+  apiKey: string,
+  model: string,
+  roomId: string,
+  difficulty: Difficulty,
+  excludedQuestions: string[],
+  attempt: number
+) {
+  const avoidList = excludedQuestions.slice(-MAX_PROMPT_HISTORY);
   const response = await fetch("https://api.openai.com/v1/responses", {
     method: "POST",
     headers: {
@@ -327,105 +243,165 @@ async function generateQuestions(roomId: string, difficulty: Difficulty): Promis
       "Content-Type": "application/json",
     },
     body: JSON.stringify({
-      model: process.env.OPENAI_MODEL || "gpt-4.1-mini",
+      model,
+      store: false,
+      reasoning: { effort: "low" },
+      max_output_tokens: 8000,
       input: [
         {
           role: "system",
           content:
-            "You create accurate, family-friendly Bible trivia. Return only valid JSON. Do not repeat questions or make near-duplicates.",
+            "You are the question editor for a family-friendly Bible trivia game. Use the 66-book Protestant Bible canon as the source of truth. Every answer must be directly supported by the cited passage. Never invent a quotation, event, person, place, or reference. Return only the requested JSON.",
         },
         {
           role: "user",
-          content: `Create exactly 10 Bible trivia questions for a multiplayer game room. Room seed: ${roomId}. Difficulty: ${difficulty}.
+          content: `Create exactly ${CANDIDATES_PER_GENERATION} candidate Bible trivia questions for a new battle.
 
-Requirements:
-- ${difficultyGuidance(difficulty)}
-- Absolutely no repeated questions and no near-duplicates.
-- Avoid these previously used question signatures: ${avoidList.join(" | ") || "none"}.
-- Mix these formats: who said this quote, fill in the gap, Bible occurrence/event, sequence/order, location, person identity, and cause/effect.
-- Include at least 2 "who said" quote questions.
-- Include at least 2 fill-in-the-gap questions using [_] or a blank.
-- Include at least 2 Bible occurrence/event questions.
-- Use both Old Testament and New Testament.
-- Make the distractor options plausible, not silly.
-- Each question must have 4 concise options, one correctIndex from 0 to 3, a short Bible reference, and a kind label.`,
+Battle seed: ${roomId}-${attempt}
+Difficulty: ${difficulty}
+Difficulty guidance: ${difficultyGuidance(difficulty)}
+
+Prioritize a varied selection from these Bible areas:
+- ${coverageBrief(`${roomId}-${attempt}`)}
+
+Editorial requirements:
+- Before returning, verify every correct answer against its Bible reference.
+- Use at least 8 distinct Bible books and include both Testaments.
+- Use no more than 2 questions from the same Bible book.
+- Mix people, places, events, quotes, fill-in-the-blank, sequence, miracles, parables, journeys, objects, and cause/effect.
+- Questions must test textual Bible knowledge, not denominational interpretation or opinion.
+- Quotes must be short, identifiable, and paired with the correct speaker and reference.
+- Give 4 concise, unique, plausible options with exactly one correct answer.
+- Vary the location of correctIndex across 0, 1, 2, and 3.
+- Do not repeat or closely paraphrase any avoided question.
+
+Avoided questions from earlier battles:
+${avoidList.length ? avoidList.map((question) => `- ${question}`).join("\n") : "- None yet"}`,
         },
       ],
       text: {
         format: {
           type: "json_schema",
-          name: "bible_trivia_questions",
+          name: "bible_trivia_candidates",
           strict: true,
-          schema: {
-            type: "object",
-            additionalProperties: false,
-            properties: {
-              questions: {
-                type: "array",
-                minItems: 10,
-                maxItems: 10,
-                items: {
-                  type: "object",
-                  additionalProperties: false,
-                  properties: {
-                    question: { type: "string" },
-                    options: {
-                      type: "array",
-                      minItems: 4,
-                      maxItems: 4,
-                      items: { type: "string" },
-                    },
-                    correctIndex: { type: "integer", minimum: 0, maximum: 3 },
-                    reference: { type: "string" },
-                    kind: { type: "string" },
-                  },
-                  required: ["question", "options", "correctIndex", "reference", "kind"],
-                },
-              },
-            },
-            required: ["questions"],
-          },
+          schema: questionSchema(),
         },
       },
     }),
   });
 
-  if (!response.ok) return fallbackSetForDifficulty(roomId, difficulty);
+  if (!response.ok) {
+    throw new Error(`OpenAI question generation failed with status ${response.status}`);
+  }
 
   const payload = (await response.json()) as Record<string, unknown>;
-  const parsed = JSON.parse(extractResponseText(payload)) as {
-    questions?: unknown[];
-  };
-  const questions = uniqueQuestions(parsed.questions?.filter(isValidQuestion) || [])
-    .filter((question) => !usedQuestionSignatures.has(questionSignature(question)))
-    .slice(0, 10);
+  const responseText = extractResponseText(payload);
+  if (!responseText) throw new Error("OpenAI returned an empty question set");
 
-  return questions?.length === 10 ? questions : fallbackSetForDifficulty(roomId, difficulty);
+  const parsed = JSON.parse(responseText) as { questions?: unknown };
+  if (!Array.isArray(parsed.questions)) {
+    throw new Error("OpenAI returned an invalid question set");
+  }
+
+  return parsed.questions.filter(isTriviaQuestion);
 }
 
-export async function GET(request: NextRequest) {
-  const roomId = request.nextUrl.searchParams.get("roomId") || "solo";
-  const difficulty = normalizeDifficulty(request.nextUrl.searchParams.get("difficulty"));
-  const cacheKey = `${roomId}:${difficulty}`;
-  const refresh = request.nextUrl.searchParams.get("refresh") === "1";
+async function generateQuestions(
+  roomId: string,
+  difficulty: Difficulty,
+  clientHistory: string[]
+): Promise<QuestionPayload> {
+  const apiKey = process.env.OPENAI_API_KEY;
+  if (!apiKey) {
+    throw new Error("OPENAI_API_KEY is not configured");
+  }
 
-  if (!refresh && questionCache.has(cacheKey)) {
-    return NextResponse.json({ questions: questionCache.get(cacheKey) || fallbackSetForDifficulty(roomId, difficulty) });
+  const model = process.env.OPENAI_MODEL || DEFAULT_MODEL;
+  const excludedQuestions = [
+    ...clientHistory,
+    ...recentQuestionSignatures,
+  ].slice(-MAX_CLIENT_HISTORY);
+  let accepted: TriviaQuestion[] = [];
+
+  for (let attempt = 1; attempt <= 2 && accepted.length < QUESTIONS_PER_BATTLE; attempt += 1) {
+    const candidates = await requestCandidateBatch(
+      apiKey,
+      model,
+      roomId,
+      difficulty,
+      [...excludedQuestions, ...accepted.map((question) => question.question)],
+      attempt
+    );
+    accepted = [
+      ...accepted,
+      ...uniqueFreshQuestions(candidates, [
+        ...excludedQuestions,
+        ...accepted.map((question) => question.question),
+      ]),
+    ];
+  }
+
+  if (accepted.length < QUESTIONS_PER_BATTLE) {
+    throw new Error("OpenAI could not produce ten sufficiently distinct questions");
+  }
+
+  const questions = accepted.slice(0, QUESTIONS_PER_BATTLE);
+  rememberQuestions(questions);
+  return { questions, source: "ai", model };
+}
+
+function normalizeHistory(value: unknown) {
+  if (!Array.isArray(value)) return [];
+  return value
+    .filter((question): question is string => typeof question === "string")
+    .map((question) => question.trim().slice(0, 220))
+    .filter(Boolean)
+    .slice(-MAX_CLIENT_HISTORY);
+}
+
+export async function POST(request: NextRequest) {
+  let body: QuestionRequest;
+  try {
+    body = (await request.json()) as QuestionRequest;
+  } catch {
+    return NextResponse.json(
+      { error: "The question request was invalid." },
+      { status: 400 }
+    );
+  }
+
+  const roomId = cleanRoomId(body.roomId);
+  const difficulty = normalizeDifficulty(body.difficulty);
+  const clientHistory = normalizeHistory(body.exclude);
+  const cacheKey = `${roomId}:${difficulty}`;
+  const cached = questionCache.get(cacheKey);
+  if (cached) {
+    return NextResponse.json(cached, {
+      headers: { "Cache-Control": "private, no-store" },
+    });
   }
 
   try {
-    const questions = await generateQuestions(roomId, difficulty);
-    questions.forEach((question) =>
-      usedQuestionSignatures.add(questionSignature(question))
+    let generation = generationInFlight.get(cacheKey);
+    if (!generation) {
+      generation = generateQuestions(roomId, difficulty, clientHistory);
+      generationInFlight.set(cacheKey, generation);
+    }
+    const payload = await generation;
+    questionCache.set(cacheKey, payload);
+    return NextResponse.json(payload, {
+      headers: { "Cache-Control": "private, no-store" },
+    });
+  } catch (error) {
+    console.error("Trivia question generation failed", error);
+    return NextResponse.json(
+      {
+        error:
+          "Fresh AI questions could not be generated right now. Please try again.",
+      },
+      { status: 502 }
     );
-    questionCache.set(cacheKey, questions);
-    return NextResponse.json({ questions });
-  } catch {
-    const questions = fallbackSetForDifficulty(roomId, difficulty);
-    questions.forEach((question) =>
-      usedQuestionSignatures.add(questionSignature(question))
-    );
-    questionCache.set(cacheKey, questions);
-    return NextResponse.json({ questions });
+  } finally {
+    generationInFlight.delete(cacheKey);
   }
 }

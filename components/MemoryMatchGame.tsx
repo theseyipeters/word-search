@@ -6,8 +6,9 @@ import * as Ably from "ably/promises";
 import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { createRoomId } from "@/lib/useWordSearch";
+import { createRoomCode, createRoomId } from "@/lib/useWordSearch";
 import { useTheme } from "@/lib/useTheme";
+import { RoomJoinForm } from "./RoomJoinForm";
 import ui from "./MemoryMatchGame.module.css";
 
 type Player = {
@@ -559,7 +560,7 @@ export function MemoryMatchGame({ roomId }: { roomId?: string }) {
         : "Connecting";
 
   const handleCreateRoom = useCallback(() => {
-    const nextRoomId = createRoomId();
+    const nextRoomId = createRoomCode();
     const roomPlayer = getOrCreatePlayer();
     sessionStorage.setItem(`memory-match-room-host:${nextRoomId}`, roomPlayer.id);
     router.push(`/memory-match/room/${nextRoomId}`);
@@ -733,7 +734,7 @@ export function MemoryMatchGame({ roomId }: { roomId?: string }) {
               <p>
                 {isSingleSetup
                   ? "Every game draws eight new pairs from a growing collection of Bible-themed words."
-                  : "Create a private room, invite your friends, and begin when every player is ready."}
+                  : "Create a private room or join with a four-digit code, then begin when every player is ready."}
               </p>
               <div className={ui.setupDetails}>
                 <span><strong>8</strong> random pairs</span>
@@ -748,6 +749,7 @@ export function MemoryMatchGame({ roomId }: { roomId?: string }) {
                 {isSingleSetup ? "Start game" : "Create room"}
                 <span aria-hidden="true">→</span>
               </button>
+              {!isSingleSetup && <RoomJoinForm gamePath="/memory-match" />}
             </div>
 
             <div className={ui.setupBoard} aria-hidden="true">

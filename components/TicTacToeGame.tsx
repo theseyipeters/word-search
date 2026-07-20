@@ -6,8 +6,9 @@ import * as Ably from "ably/promises";
 import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { createRoomId } from "@/lib/useWordSearch";
+import { createRoomCode } from "@/lib/useWordSearch";
 import { useTheme } from "@/lib/useTheme";
+import { RoomJoinForm } from "./RoomJoinForm";
 import ui from "./TicTacToeGame.module.css";
 
 type Mark = "X" | "O";
@@ -488,7 +489,7 @@ export function TicTacToeGame({ roomId }: { roomId?: string }) {
         : "Connecting";
 
   const handleCreateRoom = useCallback(() => {
-    const nextRoomId = createRoomId();
+    const nextRoomId = createRoomCode();
     const roomPlayer = getOrCreatePlayer();
     sessionStorage.setItem(`tic-tac-toe-room-host:${nextRoomId}`, roomPlayer.id);
     router.push(`/tic-tac-toe/room/${nextRoomId}`);
@@ -717,7 +718,7 @@ export function TicTacToeGame({ roomId }: { roomId?: string }) {
               <p>
                 {isSingleSetup
                   ? "Play a five-game match. X opens game one, then every game switches the opening turn between X and O."
-                  : "Create a private room for a five-game match, invite your opponent, and start once both of you are ready."}
+                  : "Create a private room or join with a four-digit code, then start the five-game match once everyone is ready."}
               </p>
               <div className={ui.setupDetails}>
                 <span><strong>5</strong> games</span>
@@ -732,6 +733,7 @@ export function TicTacToeGame({ roomId }: { roomId?: string }) {
                 {isSingleSetup ? "Start game" : "Create room"}
                 <span aria-hidden="true">→</span>
               </button>
+              {!isSingleSetup && <RoomJoinForm gamePath="/tic-tac-toe" />}
             </div>
 
             <div className={ui.setupBoard} aria-hidden="true">
