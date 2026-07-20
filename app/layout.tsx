@@ -23,7 +23,7 @@ export const metadata: Metadata = {
     template: "%s | Bible Games Hub",
   },
   description:
-    "Play multiplayer Bible-inspired games including Word Search, Tic Tac Toe, Memory Match, and AI-powered Trivia Battle.",
+    "Play Bible-inspired games together, including Word Search, Tic Tac Toe, Memory Match, Trivia Battle, and Connect Four.",
   applicationName: "Bible Games Hub",
   keywords: [
     "Bible games",
@@ -32,6 +32,7 @@ export const metadata: Metadata = {
     "word search",
     "tic tac toe",
     "memory match",
+    "connect four",
     "party games",
   ],
   authors: [{ name: "Bible Games Hub" }],
@@ -40,7 +41,7 @@ export const metadata: Metadata = {
   openGraph: {
     title: "Bible Games Hub",
     description:
-      "Play multiplayer Bible-inspired games including Word Search, Tic Tac Toe, Memory Match, and AI-powered Trivia Battle.",
+      "Play Bible-inspired games together, including Word Search, Tic Tac Toe, Memory Match, Trivia Battle, and Connect Four.",
     type: "website",
     siteName: "Bible Games Hub",
     images: [
@@ -56,7 +57,7 @@ export const metadata: Metadata = {
     card: "summary_large_image",
     title: "Bible Games Hub",
     description:
-      "Play multiplayer Bible-inspired games including Word Search, Tic Tac Toe, Memory Match, and AI-powered Trivia Battle.",
+      "Play Bible-inspired games together, including Word Search, Tic Tac Toe, Memory Match, Trivia Battle, and Connect Four.",
     images: ["/og.png"],
   },
   manifest: "/manifest.webmanifest",

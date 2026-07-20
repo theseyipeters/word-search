@@ -8,6 +8,7 @@ A multiplayer games hub built with Next.js, React, Ably, and OpenAI.
 - Tic Tac Toe
 - Memory Match
 - Trivia Battle
+- Connect Four
 
 ## Environment
 

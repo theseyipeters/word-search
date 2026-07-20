@@ -321,7 +321,7 @@
 
 .gameGrid {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
   gap: 14px;
 }
 
@@ -346,6 +346,7 @@
 .lavender { background: #ded8ff; }
 .peach { background: #ffd6bc; }
 .sky { background: #cdeafa; }
+.rose { background: #ffcddd; }
 
 .cardTopline {
   display: flex;

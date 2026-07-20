@@ -46,6 +46,15 @@ const games = [
     tone: "sky",
     description: "Put your Bible knowledge to the test in a fast-paced quiz.",
   },
+  {
+    number: "05",
+    title: "Connect Four",
+    href: "/connect-four",
+    status: "Solo + 2 players",
+    art: ["●", "●", "○", "●"],
+    tone: "rose",
+    description: "Drop your discs, plan ahead, and be first to connect four.",
+  },
 ] as const;
 
 const previewLetters = [
@@ -72,7 +81,7 @@ export default function Home() {
         </Link>
         <div className={styles.navMeta}>
           <span className={styles.liveDot} aria-hidden="true" />
-          <span>4 games ready to play</span>
+          <span>5 games ready to play</span>
         </div>
       </header>
 
