@@ -1,164 +1,185 @@
+import Image from "next/image";
 import Link from "next/link";
 import type { Metadata } from "next";
+import styles from "./home.module.css";
 
 export const metadata: Metadata = {
-  title: "Multiplayer Bible Games",
+  title: "Play Bible Games Together",
   description:
-    "Choose from multiplayer Bible-inspired games: Word Search, Tic Tac Toe, Memory Match, and AI-powered Trivia Battle.",
+    "Pick a Bible-inspired game, invite your people, and start playing together in seconds.",
 };
 
 const games = [
   {
+    number: "01",
     title: "Word Search",
     href: "/word-search",
     status: "Multiplayer",
-    accent: "WS",
-    description: "Race friends to find hidden words and score by word length.",
+    art: ["W", "O", "R", "D"],
+    tone: "lime",
+    description: "Race to uncover hidden Bible words before your friends do.",
   },
   {
+    number: "02",
     title: "Tic Tac Toe",
     href: "/tic-tac-toe",
-    status: "Multiplayer",
-    accent: "XO",
-    description: "Classic Xs and Os with room invites, turns, and rematches.",
+    status: "2 players",
+    art: ["X", "O", "X", "O"],
+    tone: "lavender",
+    description: "A familiar classic, made better with a friendly Bible theme.",
   },
   {
+    number: "03",
     title: "Memory Match",
     href: "/memory-match",
     status: "Multiplayer",
-    accent: "MM",
-    description: "Flip cards, find pairs, and race for the highest score.",
+    art: ["✦", "●", "●", "✦"],
+    tone: "peach",
+    description: "Flip, remember, and match pairs as quickly as you can.",
   },
   {
+    number: "04",
     title: "Trivia Battle",
     href: "/trivia-battle",
-    status: "AI Powered",
-    accent: "TB",
-    description: "Answer Bible questions, earn speed bonuses, and climb the leaderboard.",
+    status: "AI powered",
+    art: ["A", "B", "C", "?"],
+    tone: "sky",
+    description: "Put your Bible knowledge to the test in a fast-paced quiz.",
   },
+] as const;
+
+const previewLetters = [
+  "G", "R", "A", "C", "E",
+  "H", "O", "P", "E", "R",
+  "F", "A", "I", "T", "H",
+  "L", "I", "G", "H", "T",
+  "P", "E", "A", "C", "E",
 ];
 
 export default function Home() {
   return (
-    <main style={styles.container}>
-      <section style={styles.header}>
-        <p style={styles.eyebrow}>Games</p>
-        <h1 style={styles.title}>Choose a game</h1>
+    <main className={styles.page}>
+      <header className={styles.nav}>
+        <Link href="/" className={styles.logoLink} aria-label="Guidde games home">
+          <Image
+            src="/guidde2.svg"
+            alt="Guidde"
+            width={230}
+            height={79}
+            priority
+            className={styles.logo}
+          />
+        </Link>
+        <div className={styles.navMeta}>
+          <span className={styles.liveDot} aria-hidden="true" />
+          <span>4 games ready to play</span>
+        </div>
+      </header>
+
+      <section className={styles.hero} aria-labelledby="home-title">
+        <div className={styles.heroCopy}>
+          <p className={styles.eyebrow}>Bible games for everyone</p>
+          <h1 id="home-title">
+            Play. Connect.
+            <span>Grow together.</span>
+          </h1>
+          <p className={styles.intro}>
+            Quick, joyful games made for friends, families, and small groups.
+            Pick one, share the room, and let the fun begin.
+          </p>
+          <div className={styles.heroActions}>
+            <Link href="#games" className={styles.primaryButton}>
+              Explore games <span aria-hidden="true">↓</span>
+            </Link>
+            <span className={styles.helperText}>No downloads. Play in your browser.</span>
+          </div>
+        </div>
+
+        <Link href="/word-search" className={styles.featuredGame}>
+          <div className={styles.featuredTopline}>
+            <span>Tonight&apos;s pick</span>
+            <span className={styles.featuredBadge}>Multiplayer</span>
+          </div>
+
+          <div className={styles.wordGrid} aria-hidden="true">
+            {previewLetters.map((letter, index) => (
+              <span
+                key={`${letter}-${index}`}
+                className={index >= 10 && index <= 14 ? styles.foundLetter : undefined}
+              >
+                {letter}
+              </span>
+            ))}
+          </div>
+
+          <div className={styles.featuredFooter}>
+            <div>
+              <span className={styles.featuredLabel}>Featured game</span>
+              <h2>Word Search</h2>
+            </div>
+            <span className={styles.roundArrow} aria-hidden="true">↗</span>
+          </div>
+        </Link>
       </section>
 
-      <section style={styles.gameList} aria-label="Available games">
-        {games.map((game) => (
-          <Link key={game.href} href={game.href} style={styles.gameCard}>
-            <div style={styles.cardHeader}>
-              <span style={styles.gameMark}>{game.accent}</span>
-              <span style={styles.status}>{game.status}</span>
-            </div>
-            <div style={styles.cardBody}>
-              <h2 style={styles.gameTitle}>{game.title}</h2>
-              <p style={styles.description}>{game.description}</p>
-            </div>
-            <span style={styles.play}>Play</span>
-          </Link>
-        ))}
+      <section className={styles.gamesSection} id="games" aria-labelledby="games-title">
+        <div className={styles.sectionHeading}>
+          <div>
+            <p className={styles.eyebrow}>Find your favourite</p>
+            <h2 id="games-title">Choose a game</h2>
+          </div>
+          <p>There&apos;s something for every kind of player.</p>
+        </div>
+
+        <div className={styles.gameGrid}>
+          {games.map((game) => (
+            <Link
+              key={game.href}
+              href={game.href}
+              className={`${styles.gameCard} ${styles[game.tone]}`}
+            >
+              <div className={styles.cardTopline}>
+                <span className={styles.cardNumber}>{game.number}</span>
+                <span className={styles.status}>{game.status}</span>
+              </div>
+
+              <div className={styles.cardArt} aria-hidden="true">
+                {game.art.map((character, index) => (
+                  <span key={`${character}-${index}`}>{character}</span>
+                ))}
+              </div>
+
+              <div className={styles.cardContent}>
+                <h3>{game.title}</h3>
+                <p>{game.description}</p>
+              </div>
+
+              <span className={styles.playLink}>
+                Play now <span aria-hidden="true">↗</span>
+              </span>
+            </Link>
+          ))}
+        </div>
       </section>
+
+      <section className={styles.inviteStrip} aria-label="How to play together">
+        <p>Pick a game</p>
+        <span aria-hidden="true">→</span>
+        <p>Share the room</p>
+        <span aria-hidden="true">→</span>
+        <p>Play together</p>
+      </section>
+
+      <footer className={styles.footer}>
+        <Image
+          src="/guidde.svg"
+          alt="Guidde"
+          width={230}
+          height={79}
+          className={styles.footerLogo}
+        />
+        <p>Made for shared moments.</p>
+      </footer>
     </main>
   );
 }
-
-const styles: Record<string, React.CSSProperties> = {
-  container: {
-    minHeight: "100dvh",
-    width: "min(100% - 32px, 980px)",
-    margin: "0 auto",
-    padding: "56px 0",
-    display: "flex",
-    flexDirection: "column",
-    gap: "28px",
-  },
-  header: {
-    display: "flex",
-    flexDirection: "column",
-    gap: "8px",
-  },
-  eyebrow: {
-    color: "var(--text-secondary)",
-    fontSize: "0.85rem",
-    fontWeight: 800,
-    textTransform: "uppercase",
-    letterSpacing: "0.12em",
-  },
-  title: {
-    fontSize: "clamp(2rem, 8vw, 3.4rem)",
-    lineHeight: 1,
-    fontWeight: 800,
-  },
-  gameList: {
-    display: "grid",
-    gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))",
-    gap: "16px",
-  },
-  gameCard: {
-    display: "flex",
-    flexDirection: "column",
-    justifyContent: "space-between",
-    gap: "22px",
-    minHeight: "220px",
-    padding: "20px",
-    borderRadius: "8px",
-    border: "1px solid var(--border)",
-    background: "var(--bg-secondary)",
-    color: "var(--text)",
-    textDecoration: "none",
-  },
-  cardHeader: {
-    display: "flex",
-    justifyContent: "space-between",
-    alignItems: "center",
-    gap: "12px",
-  },
-  gameMark: {
-    width: "44px",
-    height: "44px",
-    borderRadius: "8px",
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "center",
-    border: "1px solid var(--border)",
-    background: "var(--bg)",
-    color: "var(--text)",
-    fontSize: "0.9rem",
-    fontWeight: 900,
-  },
-  cardBody: {
-    display: "flex",
-    flexDirection: "column",
-    gap: "8px",
-  },
-  gameTitle: {
-    fontSize: "1.45rem",
-    lineHeight: 1.05,
-    fontWeight: 900,
-  },
-  status: {
-    flex: "0 0 auto",
-    padding: "3px 8px",
-    borderRadius: "999px",
-    background: "var(--accent)",
-    color: "var(--accent-text)",
-    fontSize: "0.72rem",
-    fontWeight: 800,
-  },
-  description: {
-    color: "var(--text-secondary)",
-    fontSize: "0.95rem",
-    lineHeight: 1.45,
-  },
-  play: {
-    alignSelf: "flex-start",
-    padding: "9px 16px",
-    borderRadius: "8px",
-    background: "var(--accent)",
-    color: "var(--accent-text)",
-    fontWeight: 800,
-  },
-};

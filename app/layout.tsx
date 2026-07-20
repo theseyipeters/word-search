@@ -45,10 +45,10 @@ export const metadata: Metadata = {
     siteName: "Bible Games Hub",
     images: [
       {
-        url: "/og-image.png",
+        url: "/og.png",
         width: 1200,
         height: 630,
-        alt: "Bible Games Hub",
+        alt: "Play, connect, and grow together with Bible games",
       },
     ],
   },
@@ -57,7 +57,7 @@ export const metadata: Metadata = {
     title: "Bible Games Hub",
     description:
       "Play multiplayer Bible-inspired games including Word Search, Tic Tac Toe, Memory Match, and AI-powered Trivia Battle.",
-    images: ["/og-image.png"],
+    images: ["/og.png"],
   },
   manifest: "/manifest.webmanifest",
   appleWebApp: {
