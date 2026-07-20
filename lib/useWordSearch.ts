@@ -71,6 +71,15 @@ export function createRoomId() {
   return Math.random().toString(36).slice(2, 10);
 }
 
+export function createRoomCode() {
+  if (typeof crypto !== "undefined" && "getRandomValues" in crypto) {
+    const values = new Uint32Array(1);
+    crypto.getRandomValues(values);
+    return String(1000 + (values[0] % 9000));
+  }
+  return String(1000 + Math.floor(Math.random() * 9000));
+}
+
 function shuffle<T>(arr: T[], random: RandomSource = Math.random): T[] {
   const a = [...arr];
   for (let i = a.length - 1; i > 0; i--) {

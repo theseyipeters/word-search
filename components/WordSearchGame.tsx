@@ -3,15 +3,19 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type React from "react";
 import * as Ably from "ably/promises";
+import Image from "next/image";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
-  createRoomId,
+  createRoomCode,
   GRID_SIZE,
   useWordSearch,
   type Position,
 } from "@/lib/useWordSearch";
 import { useTheme } from "@/lib/useTheme";
 import { useTimer } from "@/lib/useTimer";
+import { RoomJoinForm } from "./RoomJoinForm";
+import ui from "./WordSearchGame.module.css";
 
 type WordSearchGameProps = {
   roomId?: string;
@@ -20,6 +24,8 @@ type WordSearchGameProps = {
 type Player = {
   id: string;
   name: string;
+  ready: boolean;
+  isHost: boolean;
 };
 
 type FoundWordEvent = {
@@ -28,6 +34,8 @@ type FoundWordEvent = {
   playerName: string;
   points?: number;
 };
+
+type GateView = "mode" | "single-setup" | "multiplayer-setup" | "playing";
 
 function posFromEvent(
   e: React.MouseEvent | React.TouchEvent,
@@ -56,22 +64,23 @@ function posFromEvent(
 }
 
 function getOrCreatePlayer(): Player {
-  const existingId = localStorage.getItem("word-search-player-id");
+  const existingId = sessionStorage.getItem("word-search-player-id");
   const existingName = localStorage.getItem("word-search-player-name");
 
   if (existingId && existingName) {
-    return { id: existingId, name: existingName };
+    return { id: existingId, name: existingName, ready: false, isHost: false };
   }
 
   const id =
     typeof crypto !== "undefined" && "randomUUID" in crypto
       ? crypto.randomUUID()
       : Math.random().toString(36).slice(2);
-  const name = `Player ${Math.floor(1000 + Math.random() * 9000)}`;
+  const name =
+    existingName || `Player ${Math.floor(1000 + Math.random() * 9000)}`;
 
-  localStorage.setItem("word-search-player-id", id);
+  sessionStorage.setItem("word-search-player-id", id);
   localStorage.setItem("word-search-player-name", name);
-  return { id, name };
+  return { id, name, ready: false, isHost: false };
 }
 
 function useAblyRoom(
@@ -84,10 +93,16 @@ function useAblyRoom(
     useState<Ably.Types.RealtimeChannelPromise | null>(null);
   const [connectionState, setConnectionState] = useState("idle");
   const [error, setError] = useState<string | null>(null);
+  const [isHost, setIsHost] = useState(false);
+  const [gameStarted, setGameStarted] = useState(false);
 
   useEffect(() => {
     if (!roomId) return;
-    setPlayer(getOrCreatePlayer());
+    const roomPlayer = getOrCreatePlayer();
+    const roomHost =
+      sessionStorage.getItem(`word-search-room-host:${roomId}`) === roomPlayer.id;
+    setPlayer({ ...roomPlayer, isHost: roomHost });
+    setIsHost(roomHost);
   }, [roomId]);
 
   useEffect(() => {
@@ -103,14 +118,21 @@ function useAblyRoom(
     });
 
     let mounted = true;
-    const handleMessage = (message: Ably.Types.Message) => {
-      const data = message.data as Partial<FoundWordEvent>;
-      if (typeof data.word === "string") {
-        onFoundWord(
-          data.word,
-          data.playerName || "Player",
-          data.points || data.word.length
-        );
+    const handleRoomMessage = (message: Ably.Types.Message) => {
+      if (message.name === "game-started") {
+        if (mounted) setGameStarted(true);
+        return;
+      }
+
+      if (message.name === "word-found") {
+        const data = message.data as Partial<FoundWordEvent>;
+        if (typeof data.word === "string") {
+          onFoundWord(
+            data.word,
+            data.playerName || "Player",
+            data.points || data.word.length
+          );
+        }
       }
     };
 
@@ -124,6 +146,8 @@ function useAblyRoom(
             return {
               id: member.clientId,
               name: data?.name || "Player",
+              ready: Boolean(data?.ready),
+              isHost: Boolean(data?.isHost),
             };
           })
         );
@@ -139,9 +163,15 @@ function useAblyRoom(
     });
 
     roomChannel
-      .subscribe("word-found", handleMessage)
+      .subscribe(handleRoomMessage)
       .then(() => roomChannel.presence.subscribe(refreshPresence))
-      .then(() => roomChannel.presence.enter({ name: player.name }))
+      .then(() =>
+        roomChannel.presence.enter({
+          name: player.name,
+          ready: player.ready,
+          isHost: player.isHost,
+        })
+      )
       .then(refreshPresence)
       .then(() => {
         if (mounted) {
@@ -157,7 +187,7 @@ function useAblyRoom(
 
     return () => {
       mounted = false;
-      roomChannel.unsubscribe("word-found", handleMessage);
+      roomChannel.unsubscribe(handleRoomMessage);
       roomChannel.presence.unsubscribe(refreshPresence);
       roomChannel.presence.leave().catch(() => {});
       client.close();
@@ -183,21 +213,51 @@ function useAblyRoom(
       if (!cleanName) return;
 
       localStorage.setItem("word-search-player-name", cleanName);
-      setPlayer((current) =>
-        current ? { ...current, name: cleanName } : current
-      );
-      channel?.presence.update({ name: cleanName }).catch(() => {});
+      setPlayer((current) => {
+        if (!current) return current;
+        channel?.presence
+          .update({
+            name: cleanName,
+            ready: current.ready,
+            isHost: current.isHost,
+          })
+          .catch(() => {});
+        return { ...current, name: cleanName };
+      });
     },
     [channel]
   );
 
+  const updateReady = useCallback(
+    async (ready: boolean) => {
+      if (!channel || !player) return;
+      await channel.presence.update({
+        name: player.name,
+        ready,
+        isHost: player.isHost,
+      });
+      setPlayer((current) => (current ? { ...current, ready } : current));
+    },
+    [channel, player]
+  );
+
+  const startRoomGame = useCallback(async () => {
+    if (!channel || !isHost) return;
+    await channel.publish("game-started", { startedAt: Date.now() });
+    setGameStarted(true);
+  }, [channel, isHost]);
+
   return {
     connectionState,
     error,
+    gameStarted,
+    isHost,
     player,
     players,
     publishFoundWord,
+    startRoomGame,
     updatePlayerName,
+    updateReady,
   };
 }
 
@@ -211,6 +271,7 @@ export function WordSearchGame({ roomId }: WordSearchGameProps) {
   const [copiedInvite, setCopiedInvite] = useState(false);
   const [remoteWord, setRemoteWord] = useState<FoundWordEvent | null>(null);
   const [recentEvents, setRecentEvents] = useState<FoundWordEvent[]>([]);
+  const [gateView, setGateView] = useState<GateView>("mode");
   const isMultiplayer = Boolean(roomId);
 
   const handleRemoteFoundWord = useCallback(
@@ -225,8 +286,18 @@ export function WordSearchGame({ roomId }: WordSearchGameProps) {
   );
 
   const { theme, toggle } = useTheme();
-  const { connectionState, error, player, players, publishFoundWord, updatePlayerName } =
-    useAblyRoom(roomId, handleRemoteFoundWord);
+  const {
+    connectionState,
+    error,
+    gameStarted: roomGameStarted,
+    isHost,
+    player,
+    players,
+    publishFoundWord,
+    startRoomGame,
+    updatePlayerName,
+    updateReady,
+  } = useAblyRoom(roomId, handleRemoteFoundWord);
 
   const {
     grid,
@@ -262,7 +333,10 @@ export function WordSearchGame({ roomId }: WordSearchGameProps) {
     },
   });
 
-  const { formatted, reset } = useTimer(isComplete);
+  const hasGameStarted = isMultiplayer
+    ? roomGameStarted
+    : gateView === "playing";
+  const { formatted, reset } = useTimer(isComplete, !hasGameStarted);
 
   useEffect(() => {
     roomPublishRef.current = publishFoundWord;
@@ -285,7 +359,10 @@ export function WordSearchGame({ roomId }: WordSearchGameProps) {
 
   const handleNewGame = useCallback(() => {
     if (isMultiplayer) {
-      router.push(`/word-search/room/${createRoomId()}`);
+      const nextRoomId = createRoomCode();
+      const roomPlayer = getOrCreatePlayer();
+      sessionStorage.setItem(`word-search-room-host:${nextRoomId}`, roomPlayer.id);
+      router.push(`/word-search/room/${nextRoomId}`);
       return;
     }
     newGame();
@@ -293,7 +370,10 @@ export function WordSearchGame({ roomId }: WordSearchGameProps) {
   }, [isMultiplayer, newGame, reset, router]);
 
   const handleCreateRoom = useCallback(() => {
-    router.push(`/word-search/room/${createRoomId()}`);
+    const nextRoomId = createRoomCode();
+    const roomPlayer = getOrCreatePlayer();
+    sessionStorage.setItem(`word-search-room-host:${nextRoomId}`, roomPlayer.id);
+    router.push(`/word-search/room/${nextRoomId}`);
   }, [router]);
 
   const handleCopyInvite = useCallback(async () => {
@@ -302,6 +382,12 @@ export function WordSearchGame({ roomId }: WordSearchGameProps) {
     setCopiedInvite(true);
     setTimeout(() => setCopiedInvite(false), 1800);
   }, [inviteUrl]);
+
+  const handleStartSinglePlayer = useCallback(() => {
+    newGame();
+    reset();
+    setGateView("playing");
+  }, [newGame, reset]);
 
   const handleMouseDown = useCallback(
     (e: React.MouseEvent) => {
@@ -389,14 +475,299 @@ export function WordSearchGame({ roomId }: WordSearchGameProps) {
     return "Connecting";
   }, [connectionState, error, isMultiplayer]);
 
+  const lobbyPlayers = useMemo(() => {
+    const byId = new Map(players.map((roomPlayer) => [roomPlayer.id, roomPlayer]));
+    if (player) byId.set(player.id, player);
+    return [...byId.values()].sort((a, b) => {
+      if (a.isHost !== b.isHost) return a.isHost ? -1 : 1;
+      return a.name.localeCompare(b.name);
+    });
+  }, [player, players]);
+  const everybodyReady =
+    lobbyPlayers.length >= 2 && lobbyPlayers.every((roomPlayer) => roomPlayer.ready);
+  const waitingMessage =
+    lobbyPlayers.length < 2
+      ? "Invite at least one more player to continue."
+      : everybodyReady
+        ? "Everyone is ready. Let the game begin!"
+        : "The game unlocks when everyone is ready.";
+
+  const gateNavigation = (
+    <header className={ui.gateNav}>
+      <Link href="/" aria-label="Guidde games home" className={ui.gateLogoLink}>
+        <Image
+          src="/guidde2.svg"
+          alt="Guidde"
+          width={230}
+          height={79}
+          className={ui.gateLogo}
+          priority
+        />
+      </Link>
+      <Link href="/" className={ui.menuLink}>
+        <span aria-hidden="true">←</span> Back to menu
+      </Link>
+    </header>
+  );
+
+  if (!isMultiplayer && gateView === "mode") {
+    return (
+      <div className={ui.gatePage}>
+        {gateNavigation}
+        <main className={ui.modeGate}>
+          <div className={ui.gateHeading}>
+            <p className={ui.kicker}>Word Search</p>
+            <h1>How would you like to play?</h1>
+            <p>
+              Find hidden Bible words at your own pace or race together in a
+              shared room.
+            </p>
+          </div>
+
+          <div className={ui.modeChoices}>
+            <button
+              type="button"
+              className={`${ui.modeChoice} ${ui.singleChoice}`}
+              onClick={() => setGateView("single-setup")}
+            >
+              <span className={ui.choiceNumber}>01</span>
+              <span className={ui.choiceArt} aria-hidden="true">
+                <span>F</span><span>A</span><span>I</span><span>T</span>
+              </span>
+              <span className={ui.choiceCopy}>
+                <strong>Single player</strong>
+                <small>Relax, focus, and beat your own time.</small>
+              </span>
+              <span className={ui.choiceArrow} aria-hidden="true">↗</span>
+            </button>
+
+            <button
+              type="button"
+              className={`${ui.modeChoice} ${ui.multiChoice}`}
+              onClick={() => setGateView("multiplayer-setup")}
+            >
+              <span className={ui.choiceNumber}>02</span>
+              <span className={ui.choiceArt} aria-hidden="true">
+                <span>Y</span><span>O</span><span>U</span><span>+</span>
+              </span>
+              <span className={ui.choiceCopy}>
+                <strong>Multiplayer</strong>
+                <small>Create a room and race your friends live.</small>
+              </span>
+              <span className={ui.choiceArrow} aria-hidden="true">↗</span>
+            </button>
+          </div>
+
+          <div className={ui.gateSteps} aria-label="Game setup progress">
+            <span className={ui.activeStep}>1. Choose mode</span>
+            <span>2. Get ready</span>
+            <span>3. Play</span>
+          </div>
+        </main>
+      </div>
+    );
+  }
+
+  if (!isMultiplayer && gateView !== "playing") {
+    const isSingleSetup = gateView === "single-setup";
+    return (
+      <div className={ui.gatePage}>
+        {gateNavigation}
+        <main className={ui.setupGate}>
+          <button
+            type="button"
+            className={ui.stepBack}
+            onClick={() => setGateView("mode")}
+          >
+            ← Change game mode
+          </button>
+
+          <section
+            className={`${ui.setupCard} ${
+              isSingleSetup ? ui.singleSetup : ui.multiplayerSetup
+            }`}
+          >
+            <div className={ui.setupCopy}>
+              <p className={ui.kicker}>
+                {isSingleSetup ? "Single player" : "Multiplayer"}
+              </p>
+              <h1>{isSingleSetup ? "Ready when you are." : "Bring everyone in."}</h1>
+              <p>
+                {isSingleSetup
+                  ? "You’ll have 20 hidden Bible words to find. Your timer begins as soon as you start."
+                  : "Create a private room or join one with a four-digit code, then begin once every player is ready."}
+              </p>
+              <div className={ui.setupDetails}>
+                <span><strong>20</strong> hidden words</span>
+                <span><strong>{isSingleSetup ? "1" : "2+"}</strong> players</span>
+                <span><strong>Live</strong> timer</span>
+              </div>
+              <button
+                type="button"
+                className={ui.primaryAction}
+                onClick={isSingleSetup ? handleStartSinglePlayer : handleCreateRoom}
+              >
+                {isSingleSetup ? "Start game" : "Create room"}
+                <span aria-hidden="true">→</span>
+              </button>
+              {!isSingleSetup && <RoomJoinForm gamePath="/word-search" />}
+            </div>
+
+            <div className={ui.setupArt} aria-hidden="true">
+              {Array.from("FAITHGRACEHOPELOVEXX").map((letter, index) => (
+                <span key={`${letter}-${index}`} className={index >= 5 && index <= 9 ? ui.artFound : undefined}>
+                  {letter}
+                </span>
+              ))}
+            </div>
+          </section>
+
+          <div className={ui.gateSteps} aria-label="Game setup progress">
+            <span>1. Choose mode</span>
+            <span className={ui.activeStep}>2. Get ready</span>
+            <span>3. Play</span>
+          </div>
+        </main>
+      </div>
+    );
+  }
+
+  if (isMultiplayer && !roomGameStarted) {
+    return (
+      <div className={ui.gatePage}>
+        {gateNavigation}
+        <main className={ui.waitingGate}>
+          <section className={ui.waitingIntro}>
+            <div>
+              <p className={ui.kicker}>Room {roomId?.toUpperCase()}</p>
+              <h1>Waiting for roommates.</h1>
+              <p>
+                Share the invite, choose your player name, and let everyone mark
+                themselves ready.
+              </p>
+            </div>
+
+            <div className={ui.inviteBox}>
+              <span>Private room code</span>
+              <div>
+                <strong>{roomId?.toUpperCase()}</strong>
+                <button type="button" onClick={handleCopyInvite} disabled={!inviteUrl}>
+                  {copiedInvite ? "Copied!" : "Copy invite"}
+                </button>
+              </div>
+            </div>
+
+            <div className={ui.connectionLine} role="status">
+              <span
+                className={`${ui.connectionDot} ${
+                  connectionLabel === "Live" ? ui.connectionLive : ""
+                }`}
+              />
+              {connectionLabel === "Live"
+                ? "Room is live"
+                : connectionLabel === "Offline"
+                  ? "Room is offline"
+                  : "Connecting to room"}
+            </div>
+          </section>
+
+          <section className={ui.rosterCard}>
+            <div className={ui.rosterHeader}>
+              <div>
+                <span>Players</span>
+                <strong>{lobbyPlayers.length}</strong>
+              </div>
+              <span className={ui.readyCount}>
+                {lobbyPlayers.filter((roomPlayer) => roomPlayer.ready).length} ready
+              </span>
+            </div>
+
+            <label className={ui.nameField}>
+              <span>Your player name</span>
+              <input
+                key={player?.name || "joining"}
+                aria-label="Your player name"
+                defaultValue={player?.name || ""}
+                onBlur={(event) => updatePlayerName(event.target.value)}
+                onKeyDown={(event) => {
+                  if (event.key === "Enter") event.currentTarget.blur();
+                }}
+                placeholder="Joining room…"
+                disabled={!player}
+              />
+            </label>
+
+            <div className={ui.playerList} aria-live="polite">
+              {lobbyPlayers.map((roomPlayer) => (
+                <div className={ui.playerRow} key={roomPlayer.id}>
+                  <span className={ui.playerAvatar} aria-hidden="true">
+                    {roomPlayer.name.slice(0, 1).toUpperCase()}
+                  </span>
+                  <span className={ui.playerIdentity}>
+                    <strong>
+                      {roomPlayer.id === player?.id ? "You" : roomPlayer.name}
+                    </strong>
+                    <small>{roomPlayer.isHost ? "Host" : "Player"}</small>
+                  </span>
+                  <span
+                    className={`${ui.playerStatus} ${
+                      roomPlayer.ready ? ui.playerReady : ""
+                    }`}
+                  >
+                    {roomPlayer.ready ? "Ready" : "Not ready"}
+                  </span>
+                </div>
+              ))}
+            </div>
+
+            {error && <p className={ui.lobbyError}>{error}</p>}
+
+            <button
+              type="button"
+              className={`${ui.readyAction} ${player?.ready ? ui.isReady : ""}`}
+              onClick={() => updateReady(!player?.ready)}
+              disabled={!player || connectionLabel !== "Live"}
+            >
+              {player?.ready ? "I’m ready ✓" : "I’m ready"}
+            </button>
+
+            {isHost ? (
+              <button
+                type="button"
+                className={ui.startRoomAction}
+                onClick={startRoomGame}
+                disabled={!everybodyReady}
+              >
+                Start game <span aria-hidden="true">→</span>
+              </button>
+            ) : (
+              <div className={ui.guestMessage}>
+                {player?.ready
+                  ? "You’re ready. Waiting for the host to start."
+                  : "Mark yourself ready when you’re set."}
+              </div>
+            )}
+
+            <p className={ui.waitingRule}>{waitingMessage}</p>
+          </section>
+        </main>
+      </div>
+    );
+  }
+
   return (
-    <div style={styles.container}>
+    <div className={ui.playPage} style={styles.container}>
       <header style={styles.header}>
         <div style={styles.headerLeft}>
-          <h1 style={styles.title}>Word Search</h1>
-          <span style={styles.subtitle}>
-            {foundWords.size}/{placedWords.length} found
-          </span>
+          <Link href="/" className={ui.gameMenuLink}>
+            <span aria-hidden="true">←</span> Menu
+          </Link>
+          <div>
+            <h1 style={styles.title}>Word Search</h1>
+            <span style={styles.subtitle}>
+              {foundWords.size}/{placedWords.length} found
+            </span>
+          </div>
           {connectionLabel && (
             <span
               style={{
@@ -413,11 +784,6 @@ export function WordSearchGame({ roomId }: WordSearchGameProps) {
           <button onClick={toggle} style={styles.themeBtn} title="Toggle theme">
             {theme === "dark" ? "Light" : "Dark"}
           </button>
-          {!isMultiplayer && (
-            <button onClick={handleCreateRoom} style={styles.roomBtn}>
-              Create Room
-            </button>
-          )}
           <button onClick={handleNewGame} style={styles.newGameBtn}>
             {isMultiplayer ? "New Room" : "New Game"}
           </button>
@@ -596,13 +962,15 @@ export function WordSearchGame({ roomId }: WordSearchGameProps) {
 const styles: Record<string, React.CSSProperties> = {
   container: {
     minHeight: "100dvh",
+    width: "min(100% - 32px, 1180px)",
     display: "flex",
     flexDirection: "column",
     alignItems: "center",
-    padding: "24px 16px",
-    maxWidth: "900px",
+    padding: "28px 0 64px",
+    maxWidth: "none",
     margin: "0 auto",
-    gap: "18px",
+    gap: "22px",
+    fontFamily: "var(--font-oxygen), 'Oxygen', sans-serif",
     userSelect: "none",
     WebkitUserSelect: "none",
   },
@@ -613,11 +981,15 @@ const styles: Record<string, React.CSSProperties> = {
     width: "100%",
     gap: "16px",
     flexWrap: "wrap",
+    padding: "14px 16px",
+    border: "1px solid var(--border)",
+    borderRadius: "18px",
+    background: "var(--bg-secondary)",
   },
   headerLeft: {
     display: "flex",
-    alignItems: "baseline",
-    gap: "12px",
+    alignItems: "center",
+    gap: "16px",
     flexWrap: "wrap",
   },
   headerRight: {
@@ -631,6 +1003,8 @@ const styles: Record<string, React.CSSProperties> = {
     fontWeight: 700,
   },
   subtitle: {
+    display: "block",
+    marginTop: "2px",
     fontSize: "0.9rem",
     color: "var(--text-secondary)",
     fontWeight: 400,
@@ -650,7 +1024,7 @@ const styles: Record<string, React.CSSProperties> = {
     color: "#176b35",
   },
   timer: {
-    fontFamily: "var(--font-jost), monospace",
+    fontFamily: "var(--font-oxygen), 'Oxygen', monospace",
     fontSize: "1rem",
     fontWeight: 500,
     color: "var(--text-secondary)",
@@ -673,18 +1047,18 @@ const styles: Record<string, React.CSSProperties> = {
     border: "1px solid var(--border)",
     background: "var(--bg-secondary)",
     color: "var(--text)",
-    fontFamily: "var(--font-jost), sans-serif",
+    fontFamily: "var(--font-oxygen), 'Oxygen', sans-serif",
     fontSize: "0.9rem",
     fontWeight: 600,
     cursor: "pointer",
   },
   newGameBtn: {
     padding: "8px 18px",
-    borderRadius: "8px",
+    borderRadius: "999px",
     border: "none",
     background: "var(--accent)",
     color: "var(--accent-text)",
-    fontFamily: "var(--font-jost), sans-serif",
+    fontFamily: "var(--font-oxygen), 'Oxygen', sans-serif",
     fontSize: "0.9rem",
     fontWeight: 600,
     cursor: "pointer",
@@ -697,7 +1071,7 @@ const styles: Record<string, React.CSSProperties> = {
     alignItems: "center",
     padding: "12px 14px",
     border: "1px solid var(--border)",
-    borderRadius: "8px",
+    borderRadius: "18px",
     background: "var(--bg-secondary)",
   },
   roomActions: {
@@ -723,7 +1097,7 @@ const styles: Record<string, React.CSSProperties> = {
     border: "1px solid var(--border)",
     background: "var(--bg)",
     color: "var(--text)",
-    fontFamily: "var(--font-jost), sans-serif",
+    fontFamily: "var(--font-oxygen), 'Oxygen', sans-serif",
     fontSize: "0.9rem",
     fontWeight: 600,
   },
@@ -775,8 +1149,8 @@ const styles: Record<string, React.CSSProperties> = {
     gap: "18px",
   },
   leaderboard: {
-    padding: "14px",
-    borderRadius: "8px",
+    padding: "18px",
+    borderRadius: "18px",
     border: "1px solid var(--border)",
     background: "var(--bg-secondary)",
   },
@@ -854,7 +1228,7 @@ const styles: Record<string, React.CSSProperties> = {
     width: "min(100%, 560px)",
     aspectRatio: "1",
     background: "var(--border)",
-    borderRadius: "16px",
+    borderRadius: "24px",
     overflow: "hidden",
     border: "2px solid var(--border)",
     position: "relative",
@@ -978,7 +1352,7 @@ const styles: Record<string, React.CSSProperties> = {
     border: "none",
     background: "var(--accent)",
     color: "var(--accent-text)",
-    fontFamily: "var(--font-jost), sans-serif",
+    fontFamily: "var(--font-oxygen), 'Oxygen', sans-serif",
     fontSize: "1rem",
     fontWeight: 600,
     cursor: "pointer",

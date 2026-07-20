@@ -1,11 +1,11 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 
-export function useTimer(isComplete: boolean) {
+export function useTimer(isComplete: boolean, isPaused = false) {
   const [seconds, setSeconds] = useState(0);
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   useEffect(() => {
-    if (isComplete) {
+    if (isComplete || isPaused) {
       if (intervalRef.current) clearInterval(intervalRef.current);
       return;
     }
@@ -13,7 +13,7 @@ export function useTimer(isComplete: boolean) {
     return () => {
       if (intervalRef.current) clearInterval(intervalRef.current);
     };
-  }, [isComplete]);
+  }, [isComplete, isPaused]);
 
   const reset = useCallback(() => setSeconds(0), []);
 
