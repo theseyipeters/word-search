@@ -1,0 +1,288 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Guidde Play — Bible Game Night</title>
+    <style>
+      @font-face {
+        font-family: "Oxygen";
+        src: url("/social/Oxygen-Bold.woff2") format("woff2");
+        font-style: normal;
+        font-weight: 700;
+        font-display: swap;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      html,
+      body {
+        width: 1080px;
+        height: 1350px;
+        margin: 0;
+        overflow: hidden;
+      }
+
+      body {
+        font-family: "Oxygen", sans-serif;
+        font-weight: 700;
+        background: #171717;
+      }
+
+      .flyer {
+        position: relative;
+        width: 1080px;
+        height: 1350px;
+        overflow: hidden;
+        color: #fff;
+        background: #171717 url("/social/guidde-play-flyer-v2-background.png") center / cover no-repeat;
+        isolation: isolate;
+      }
+
+      .flyer::after {
+        content: "";
+        position: absolute;
+        inset: 0;
+        z-index: -1;
+        background: linear-gradient(180deg, rgba(23, 23, 23, 0.04) 0%, rgba(23, 23, 23, 0.18) 100%);
+      }
+
+      .topbar {
+        position: absolute;
+        top: 64px;
+        left: 70px;
+        right: 70px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+      }
+
+      .logo {
+        display: block;
+        width: 206px;
+        height: auto;
+      }
+
+      .eyebrow {
+        display: inline-flex;
+        align-items: center;
+        gap: 11px;
+        padding: 14px 19px;
+        border: 1px solid rgba(255, 255, 255, 0.25);
+        border-radius: 999px;
+        background: rgba(23, 23, 23, 0.64);
+        color: #dfff65;
+        font-size: 15px;
+        line-height: 1;
+        letter-spacing: 0.14em;
+        text-transform: uppercase;
+      }
+
+      .eyebrow::before {
+        content: "";
+        width: 10px;
+        height: 10px;
+        border-radius: 50%;
+        background: #dfff65;
+        box-shadow: 0 0 20px rgba(223, 255, 101, 0.72);
+      }
+
+      .hero {
+        position: absolute;
+        top: 156px;
+        left: 70px;
+        width: 910px;
+      }
+
+      h1 {
+        max-width: 900px;
+        margin: 0;
+        color: #fff;
+        font-size: 88px;
+        line-height: 0.96;
+        letter-spacing: -0.055em;
+      }
+
+      h1 .accent {
+        color: #dfff65;
+      }
+
+      .subhead {
+        width: 715px;
+        margin: 24px 0 0;
+        color: rgba(255, 255, 255, 0.74);
+        font-size: 23px;
+        line-height: 1.45;
+        letter-spacing: -0.02em;
+      }
+
+      .games {
+        position: absolute;
+        top: 508px;
+        left: 0;
+        width: 1080px;
+        height: 740px;
+      }
+
+      .game-card {
+        position: absolute;
+        width: 430px;
+        height: 430px;
+        padding: 12px;
+        overflow: hidden;
+        border: 1px solid rgba(255, 255, 255, 0.22);
+        border-radius: 38px;
+        background: rgba(255, 255, 255, 0.1);
+        box-shadow: 0 30px 70px rgba(0, 0, 0, 0.38);
+      }
+
+      .game-card img {
+        display: block;
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+        border-radius: 27px;
+      }
+
+      .game-card .label {
+        position: absolute;
+        left: 34px;
+        bottom: 33px;
+        display: inline-flex;
+        align-items: center;
+        gap: 12px;
+        padding: 13px 18px;
+        border: 1px solid rgba(255, 255, 255, 0.18);
+        border-radius: 999px;
+        background: rgba(23, 23, 23, 0.9);
+        box-shadow: 0 12px 30px rgba(0, 0, 0, 0.28);
+        color: #fff;
+        font-size: 17px;
+        line-height: 1;
+        letter-spacing: -0.02em;
+      }
+
+      .game-card .label span {
+        display: grid;
+        width: 24px;
+        height: 24px;
+        place-items: center;
+        border-radius: 50%;
+        background: #dfff65;
+        color: #171717;
+        font-size: 12px;
+      }
+
+      .word-search {
+        top: 16px;
+        left: 78px;
+        z-index: 2;
+        transform: rotate(-4deg);
+      }
+
+      .word-search .label,
+      .tic-tac-toe .label {
+        top: 33px;
+        bottom: auto;
+      }
+
+      .tic-tac-toe {
+        top: 20px;
+        right: 67px;
+        z-index: 3;
+        transform: rotate(4deg);
+      }
+
+      .memory-match {
+        top: 330px;
+        left: 91px;
+        z-index: 4;
+        transform: rotate(3deg);
+      }
+
+      .trivia-battle {
+        top: 340px;
+        right: 78px;
+        z-index: 5;
+        transform: rotate(-3deg);
+      }
+
+      .footer {
+        position: absolute;
+        left: 70px;
+        right: 70px;
+        bottom: 46px;
+        z-index: 10;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+      }
+
+      .footer-copy {
+        color: rgba(255, 255, 255, 0.68);
+        font-size: 16px;
+        letter-spacing: 0.01em;
+      }
+
+      .cta {
+        display: inline-flex;
+        align-items: center;
+        gap: 14px;
+        padding: 17px 22px;
+        border-radius: 999px;
+        background: #dfff65;
+        color: #171717;
+        font-size: 17px;
+        line-height: 1;
+        letter-spacing: 0.02em;
+      }
+
+      .cta-arrow {
+        font-size: 22px;
+        line-height: 0.7;
+      }
+    </style>
+  </head>
+  <body>
+    <main class="flyer" aria-label="Guidde Play social media flyer">
+      <header class="topbar">
+        <img class="logo" src="/guidde.svg" alt="Guidde Play" />
+        <div class="eyebrow">Now playing</div>
+      </header>
+
+      <section class="hero">
+        <h1>Bible game night<br />just got <span class="accent">better.</span></h1>
+        <p class="subhead">Four ways to play, learn and laugh—solo or with your people. Only on Guidde Play.</p>
+      </section>
+
+      <section class="games" aria-label="Games available on Guidde Play">
+        <article class="game-card word-search">
+          <img src="/social/ui-word-search-art-v2.png" alt="Word Search game screen" />
+          <div class="label"><span>01</span> Word Search</div>
+        </article>
+
+        <article class="game-card tic-tac-toe">
+          <img src="/social/ui-tic-tac-toe-art-v2.png" alt="Tic Tac Toe game screen" />
+          <div class="label"><span>02</span> Tic Tac Toe</div>
+        </article>
+
+        <article class="game-card memory-match">
+          <img src="/social/ui-memory-match-art-v2.png" alt="Memory Match game screen" />
+          <div class="label"><span>03</span> Memory Match</div>
+        </article>
+
+        <article class="game-card trivia-battle">
+          <img src="/social/ui-trivia-battle-art-v2.png" alt="Trivia Battle game screen" />
+          <div class="label"><span>04</span> Trivia Battle</div>
+        </article>
+      </section>
+
+      <footer class="footer">
+        <div class="footer-copy">Pick a game · Create a room · Play together</div>
+        <div class="cta">PLAY NOW <span class="cta-arrow">→</span></div>
+      </footer>
+    </main>
+  </body>
+</html>

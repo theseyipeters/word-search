@@ -1,10 +1,12 @@
-const CACHE_NAME = "bible-games-hub-v1";
+const CACHE_NAME = "bible-games-hub-v3";
 const APP_SHELL = [
   "/",
   "/word-search",
   "/tic-tac-toe",
   "/memory-match",
   "/trivia-battle",
+  "/connect-four",
+  "/word-scramble",
   "/manifest.webmanifest",
   "/icon-192.png",
   "/icon-512.png",

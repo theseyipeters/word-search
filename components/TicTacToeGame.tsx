@@ -615,7 +615,7 @@ export function TicTacToeGame({ roomId }: { roomId?: string }) {
     <header className={ui.gateNav}>
       <Link href="/" aria-label="Guidde games home" className={ui.gateLogoLink}>
         <Image
-          src="/guidde2.svg"
+          src="/guidde3.svg"
           alt="Guidde"
           width={230}
           height={79}
