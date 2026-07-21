@@ -1,3 +1,5 @@
+import { BIBLE_WORD_HINTS } from "@/lib/bibleWordHints";
+
 export type BibleWordCategory =
   | "Bible book"
   | "Bible person"
@@ -12,6 +14,8 @@ export type BibleWordEntry = {
   answer: string;
   category: BibleWordCategory;
   difficulty: BibleWordDifficulty;
+  hint: string;
+  reference?: string;
 };
 
 const WORD_GROUPS: Array<{ category: BibleWordCategory; words: string[] }> = [
@@ -94,12 +98,20 @@ export const BIBLE_WORDS: BibleWordEntry[] = WORD_GROUPS.flatMap(({ category, wo
   words
     .map((answer) => answer.toUpperCase().replace(/[^A-Z]/g, ""))
     .filter((answer) => answer.length >= 4 && !seen.has(answer) && seen.add(answer))
-    .map((answer) => ({
-      id: answer.toLowerCase(),
-      answer,
-      category,
-      difficulty: difficultyFor(answer),
-    }))
+    .map((answer) => {
+      const hint = BIBLE_WORD_HINTS[answer];
+      if (!hint) {
+        throw new Error(`Missing contextual Bible-word hint for ${answer}`);
+      }
+      return {
+        id: answer.toLowerCase(),
+        answer,
+        category,
+        difficulty: difficultyFor(answer),
+        hint: hint.clue,
+        reference: hint.reference,
+      };
+    })
 );
 
 type SelectionOptions = {
