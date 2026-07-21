@@ -17,6 +17,7 @@ import {
   trackRoomJoined,
 } from "@/lib/gameTelemetry";
 import { ArrowIcon } from "./ArrowIcon";
+import { FinalStandings } from "./FinalPosition";
 import { RoomJoinForm } from "./RoomJoinForm";
 import shell from "./TicTacToeGame.module.css";
 import ui from "./ConnectFourGame.module.css";
@@ -610,6 +611,24 @@ export function ConnectFourGame({ roomId }: { roomId?: string }) {
   const playerViolet = players.find(
     (roomPlayer) => assignments.get(roomPlayer.id) === "violet"
   );
+  const finalMatchRows = startEvent
+    ? [
+        {
+          id: startEvent.playerLimeId,
+          name:
+            playerLime?.name ||
+            (player?.id === startEvent.playerLimeId ? player.name : "Lime"),
+          score: displayScores.lime,
+        },
+        {
+          id: startEvent.playerVioletId,
+          name:
+            playerViolet?.name ||
+            (player?.id === startEvent.playerVioletId ? player.name : "Violet"),
+          score: displayScores.violet,
+        },
+      ]
+    : [];
   const connectionLabel = !isMultiplayer
     ? null
     : error
@@ -1263,6 +1282,13 @@ export function ConnectFourGame({ roomId }: { roomId?: string }) {
               <span>Draws <strong>{displayScores.draws}</strong></span>
               <span>Violet <strong>{displayScores.violet}</strong></span>
             </div>
+            {isMultiplayer && isMatchComplete ? (
+              <FinalStandings
+                rows={finalMatchRows}
+                currentPlayerId={player?.id}
+                scoreLabel={(score) => score === 1 ? "win" : "wins"}
+              />
+            ) : null}
             <div className={ui.modalActions}>
               <button type="button" onClick={handleReset} className={ui.primaryButton}>
                 {isMatchComplete

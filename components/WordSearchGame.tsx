@@ -25,6 +25,7 @@ import {
 } from "@/lib/gameTelemetry";
 import { takeBibleWordCycle } from "@/lib/bibleWords";
 import { ArrowIcon } from "./ArrowIcon";
+import { FinalStandings } from "./FinalPosition";
 import { RoomJoinForm } from "./RoomJoinForm";
 import ui from "./WordSearchGame.module.css";
 
@@ -1011,11 +1012,24 @@ export function WordSearchGame({ roomId }: WordSearchGameProps) {
             <div style={styles.modalEmoji}>&#10024;</div>
             <h2 style={styles.modalTitle}>Puzzle Complete!</h2>
             <p style={styles.modalText}>
-              You found all {placedWords.length} words in {formatted}
+              {isMultiplayer ? "Your room" : "You"} found all {placedWords.length} words in {formatted}
             </p>
-            <button onClick={handleNewGame} style={styles.modalBtn}>
-              {isMultiplayer ? "Start New Room" : "Play Again"}
-            </button>
+            {isMultiplayer ? (
+              <FinalStandings
+                rows={leaderboard.map((entry) => ({
+                  id: entry.name,
+                  name: entry.name,
+                  score: entry.score,
+                }))}
+                currentPlayerId={player?.name}
+              />
+            ) : null}
+            <div style={styles.modalActions}>
+              <button onClick={handleNewGame} style={styles.modalBtn}>
+                {isMultiplayer ? "Start New Room" : "Play Again"}
+              </button>
+              <Link href="/" style={styles.modalSecondaryBtn}>Back to Menu</Link>
+            </div>
           </div>
         </div>
       )}
@@ -1202,7 +1216,7 @@ const styles: Record<string, React.CSSProperties> = {
     width: "100%",
     alignItems: "flex-start",
     flexWrap: "wrap",
-    justifyContent: "center",
+    justifyContent: "safe center",
   },
   sidePanel: {
     flex: "1 1 220px",
@@ -1389,10 +1403,12 @@ const styles: Record<string, React.CSSProperties> = {
   modal: {
     background: "var(--bg-secondary)",
     borderRadius: "24px",
-    padding: "48px 40px",
+    padding: "clamp(30px, 5vw, 52px)",
     textAlign: "center",
-    maxWidth: "380px",
-    width: "90%",
+    maxWidth: "600px",
+    width: "calc(100% - 32px)",
+    maxHeight: "calc(100dvh - 48px)",
+    overflowY: "auto",
     border: "1px solid var(--border)",
     boxShadow: "0 24px 48px var(--shadow)",
   },
@@ -1420,5 +1436,21 @@ const styles: Record<string, React.CSSProperties> = {
     fontSize: "1rem",
     fontWeight: 600,
     cursor: "pointer",
+  },
+  modalActions: {
+    display: "flex",
+    flexWrap: "wrap",
+    justifyContent: "center",
+    gap: "10px",
+  },
+  modalSecondaryBtn: {
+    padding: "12px 24px",
+    borderRadius: "12px",
+    border: "1px solid var(--border)",
+    background: "transparent",
+    color: "var(--text)",
+    fontSize: "1rem",
+    fontWeight: 600,
+    textDecoration: "none",
   },
 };

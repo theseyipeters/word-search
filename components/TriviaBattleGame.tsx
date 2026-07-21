@@ -16,6 +16,7 @@ import {
   trackRoomJoined,
 } from "@/lib/gameTelemetry";
 import { ArrowIcon } from "./ArrowIcon";
+import { FinalStandings } from "./FinalPosition";
 import { RoomJoinForm } from "./RoomJoinForm";
 import ui from "./TriviaBattleGame.module.css";
 
@@ -1208,11 +1209,16 @@ export function TriviaBattleGame({ roomId }: { roomId?: string }) {
                   ? `You finish on top with ${topScore} points.`
                   : `${winnerName} finishes on top with ${topScore} points.`}
             </p>
-            <div className={ui.finalScores}>
-              {sortedScores.slice(0, 3).map((row, index) => (
-                <div key={row.name}><span>#{index + 1} {row.name}</span><strong>{row.score}</strong></div>
-              ))}
-            </div>
+            {isMultiplayer ? (
+              <FinalStandings
+                rows={sortedScores.map((row) => ({
+                  id: row.name,
+                  name: row.name,
+                  score: row.score,
+                }))}
+                currentPlayerId={player?.name}
+              />
+            ) : null}
             <div className={ui.modalActions}>
               {(!isMultiplayer || isHost) ? (
                 <button type="button" className={ui.primaryModalAction} onClick={handleReset}>

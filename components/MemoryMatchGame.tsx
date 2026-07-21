@@ -17,6 +17,7 @@ import {
   trackRoomJoined,
 } from "@/lib/gameTelemetry";
 import { ArrowIcon } from "./ArrowIcon";
+import { FinalStandings } from "./FinalPosition";
 import { RoomJoinForm } from "./RoomJoinForm";
 import ui from "./MemoryMatchGame.module.css";
 
@@ -1078,6 +1079,17 @@ export function MemoryMatchGame({ roomId }: { roomId?: string }) {
                 ? `${winningNames.join(" and ")} tied with ${topScore} pairs each.`
                 : `${winningNames[0] || "You"} found the most pairs with ${topScore} pair${topScore === 1 ? "" : "s"}.`}
             </p>
+            {isMultiplayer ? (
+              <FinalStandings
+                rows={scoreRows.map((row) => ({
+                  id: row.name,
+                  name: row.name,
+                  score: row.score,
+                }))}
+                currentPlayerId={player?.name}
+                scoreLabel={(score) => score === 1 ? "pair" : "pairs"}
+              />
+            ) : null}
             <div style={styles.modalActions}>
               <button onClick={handleReset} style={styles.primaryBtn}>
                 Play a new deck
@@ -1221,7 +1233,7 @@ const styles: Record<string, React.CSSProperties> = {
   },
   gameArea: {
     display: "flex",
-    justifyContent: "center",
+    justifyContent: "safe center",
     alignItems: "flex-start",
     gap: "32px",
     flexWrap: "wrap",
@@ -1349,9 +1361,11 @@ const styles: Record<string, React.CSSProperties> = {
     zIndex: 100,
   },
   modal: {
-    width: "min(100%, 360px)",
-    padding: "28px",
-    borderRadius: "24px",
+    width: "min(100%, 580px)",
+    maxHeight: "calc(100dvh - 48px)",
+    overflowY: "auto",
+    padding: "clamp(28px, 5vw, 48px)",
+    borderRadius: "28px",
     border: "1px solid var(--border)",
     background: "var(--bg-secondary)",
     boxShadow: "0 24px 48px var(--shadow)",

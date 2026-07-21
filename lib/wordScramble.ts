@@ -6,6 +6,8 @@ export type ScrambleRound = {
   answer: string;
   scrambled: string;
   category: string;
+  hint: string;
+  reference?: string;
 };
 
 export type ScrambleTimerState = {
@@ -13,6 +15,16 @@ export type ScrambleTimerState = {
   roundIndex: number;
   secondsLeft: number;
 };
+
+export function createScrambleQueue(count: number) {
+  return Array.from({ length: Math.max(0, count) }, (_, index) => index);
+}
+
+export function moveScrambleWordToEnd(queue: number[], position: number) {
+  const wordIndex = queue[position];
+  if (typeof wordIndex !== "number") return queue;
+  return [...queue, wordIndex];
+}
 
 type WordEntry = {
   answer: string;
@@ -169,6 +181,20 @@ function scramble(answer: string, random: () => number) {
   return scrambled === answer ? `${answer.slice(1)}${answer[0]}` : scrambled;
 }
 
+export function reshuffleScramble(answer: string, current: string) {
+  for (let attempt = 0; attempt < 16; attempt += 1) {
+    const candidate = shuffle(answer.split(""), Math.random).join("");
+    if (candidate !== answer && candidate !== current) return candidate;
+  }
+
+  for (let offset = 1; offset < answer.length; offset += 1) {
+    const candidate = `${answer.slice(offset)}${answer.slice(0, offset)}`;
+    if (candidate !== answer && candidate !== current) return candidate;
+  }
+
+  return current;
+}
+
 export function createScrambleRounds(
   seed: string,
   difficulty: ScrambleDifficulty,
@@ -184,6 +210,8 @@ export function createScrambleRounds(
     .map((entry) => ({
       answer: entry.answer,
       category: entry.category,
+      hint: entry.hint,
+      reference: entry.reference,
       scrambled: scramble(entry.answer, random),
     }));
 }
@@ -196,9 +224,12 @@ export function calculateScramblePoints(
   secondsLeft: number,
   roundSeconds: number,
   wrongAttempts: number,
-  usedHint: boolean
+  usedHint: boolean,
+  wasSkipped = false
 ) {
-  const speedPoints = Math.round((Math.max(0, secondsLeft) / roundSeconds) * 900);
+  const speedPoints = wasSkipped
+    ? 0
+    : Math.round((Math.max(0, secondsLeft) / roundSeconds) * 900);
   const penalties = wrongAttempts * 75 + (usedHint ? 150 : 0);
   return Math.max(100, 100 + speedPoints - penalties);
 }

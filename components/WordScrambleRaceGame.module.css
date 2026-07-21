@@ -13,7 +13,7 @@
   margin: 42px auto 34px;
   display: flex;
   align-items: center;
-  justify-content: center;
+  justify-content: safe center;
   gap: 6px;
   transform: rotate(-3deg);
 }
@@ -337,13 +337,49 @@
   text-align: center;
 }
 
-.scramblePrompt > p {
-  margin-bottom: 20px;
+.scrambleHeading {
+  margin: 0 auto 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+}
+
+.scrambleHeading > p {
   color: var(--text-secondary);
   font-size: 0.7rem;
   font-weight: 700;
   letter-spacing: 0.14em;
   text-transform: uppercase;
+}
+
+.scrambleHeading button {
+  min-height: 32px;
+  padding: 0 11px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--bg-secondary);
+  color: var(--text);
+  cursor: pointer;
+  font: inherit;
+  font-size: 0.64rem;
+  font-weight: 700;
+  letter-spacing: 0;
+  text-transform: none;
+  transition: background 160ms ease, border-color 160ms ease, transform 160ms ease;
+}
+
+.scrambleHeading button:hover:not(:disabled) {
+  border-color: var(--text-secondary);
+  transform: translateY(-1px);
+}
+
+.scrambleHeading button:disabled {
+  cursor: not-allowed;
+  opacity: 0.45;
 }
 
 .letterTiles {
@@ -469,6 +505,23 @@
   font-size: 0.78rem;
 }
 
+.answerBar .contextualHint {
+  max-width: 62ch;
+  color: var(--text);
+  font-size: 0.72rem;
+}
+
+.contextualHint strong {
+  color: var(--text);
+}
+
+.contextualHint span {
+  display: block;
+  margin-top: 2px;
+  color: var(--text-secondary);
+  font-size: 0.62rem;
+}
+
 .answerBar button {
   min-height: 40px;
   padding: 0 13px;
@@ -489,6 +542,33 @@
 .answerBar button small {
   color: var(--text-secondary);
   font-size: 0.56rem;
+}
+
+.answerActions {
+  display: flex !important;
+  align-items: center;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: 8px !important;
+}
+
+.answerActions button:disabled {
+  cursor: not-allowed;
+  opacity: 0.45;
+}
+
+.answerActions .skipAction {
+  border-color: #e5a883;
+  background: #ffd6bc;
+  color: #4d2a18;
+}
+
+.answerActions .skipAction small {
+  color: #805039;
+}
+
+.answerActions .skipAction:hover:not(:disabled) {
+  background: #ffc39f;
 }
 
 .completePlaceholder {
@@ -665,7 +745,9 @@
 }
 
 .modal {
-  width: min(100%, 540px);
+  width: min(100%, 620px);
+  max-height: calc(100dvh - 40px);
+  overflow-y: auto;
   padding: clamp(28px, 6vw, 48px);
   border: 1px solid var(--border);
   border-radius: 28px;

@@ -9,9 +9,12 @@ import { useRouter } from "next/navigation";
 import {
   SCRAMBLE_DIFFICULTIES,
   calculateScramblePoints,
+  createScrambleQueue,
   createScrambleRounds,
   getScrambleRoundSeconds,
   normalizeScrambleGuess,
+  moveScrambleWordToEnd,
+  reshuffleScramble,
   type ScrambleDifficulty,
 } from "@/lib/wordScramble";
 import { createRoomCode, createRoomId } from "@/lib/useWordSearch";
@@ -26,7 +29,9 @@ import {
   trackRoomJoined,
 } from "@/lib/gameTelemetry";
 import { ArrowIcon } from "./ArrowIcon";
+import { FinalStandings } from "./FinalPosition";
 import { RoomJoinForm } from "./RoomJoinForm";
+import { ShuffleIcon } from "./ShuffleIcon";
 import shell from "./TriviaBattleGame.module.css";
 import ui from "./WordScrambleRaceGame.module.css";
 
@@ -44,12 +49,8 @@ type SolveEvent = {
   points: number;
   playerId: string;
   playerName: string;
-};
-
-type AdvanceEvent = {
-  gameId: string;
-  roundIndex: number;
-  playerName: string;
+  solvedCount: number;
+  completed: boolean;
 };
 
 type StartEvent = {
@@ -98,7 +99,6 @@ function isDifficulty(value: unknown): value is ScrambleDifficulty {
 function useWordScrambleRoom(
   roomId: string | undefined,
   onSolve: (event: SolveEvent) => void,
-  onAdvance: (event: AdvanceEvent) => void,
   onStart: (event: StartEvent) => void
 ) {
   const [player, setPlayer] = useState<Player | null>(null);
@@ -179,7 +179,9 @@ function useWordScrambleRoom(
           typeof data.gameId === "string" &&
           typeof data.roundIndex === "number" &&
           typeof data.points === "number" &&
-          typeof data.playerId === "string"
+          typeof data.playerId === "string" &&
+          typeof data.solvedCount === "number" &&
+          typeof data.completed === "boolean"
         ) {
           onSolve({
             solveId: data.solveId,
@@ -188,23 +190,11 @@ function useWordScrambleRoom(
             points: data.points,
             playerId: data.playerId,
             playerName: data.playerName || "Player",
+            solvedCount: data.solvedCount,
+            completed: data.completed,
           });
         }
         return;
-      }
-
-      if (message.name === "advance") {
-        const data = message.data as Partial<AdvanceEvent>;
-        if (
-          typeof data.gameId === "string" &&
-          typeof data.roundIndex === "number"
-        ) {
-          onAdvance({
-            gameId: data.gameId,
-            roundIndex: data.roundIndex,
-            playerName: data.playerName || "Player",
-          });
-        }
       }
     };
 
@@ -244,7 +234,7 @@ function useWordScrambleRoom(
       roomChannel.presence.leave().catch(() => {});
       client.close();
     };
-  }, [onAdvance, onSolve, onStart, player?.id, roomId]);
+  }, [onSolve, onStart, player?.id, roomId]);
 
   const publishSolve = useCallback(
     async (event: Omit<SolveEvent, "solveId" | "playerId" | "playerName">) => {
@@ -257,18 +247,6 @@ function useWordScrambleRoom(
       } satisfies SolveEvent);
     },
     [channel, player]
-  );
-
-  const publishAdvance = useCallback(
-    async (gameId: string, roundIndex: number) => {
-      if (!channel || !player || !isHost) return;
-      await channel.publish("advance", {
-        gameId,
-        roundIndex,
-        playerName: player.name,
-      } satisfies AdvanceEvent);
-    },
-    [channel, isHost, player]
   );
 
   const updatePlayerName = useCallback(
@@ -327,7 +305,6 @@ function useWordScrambleRoom(
     isHost,
     player,
     players,
-    publishAdvance,
     publishSolve,
     startEvent,
     startRoomGame,
@@ -343,31 +320,36 @@ export function WordScrambleRaceGame({ roomId }: { roomId?: string }) {
   const activeGameId = useRef(initialGameId.current);
   const processedSolves = useRef(new Set<string>());
   const solvedPlayerRounds = useRef(new Set<string>());
+  const skippedWordIndexes = useRef(new Set<number>());
+  const localSolvedWordIndexes = useRef(new Set<number>());
   const [race, setRace] = useState<{
     gameId: string;
     difficulty: ScrambleDifficulty;
     roundIndex: number;
     wordAnswers?: string[];
+    wordQueue: number[];
   }>({
     gameId: initialGameId.current,
     difficulty: getInitialDifficulty(),
     roundIndex: 0,
+    wordQueue: createScrambleQueue(ROUND_COUNT),
   });
   const [timerState, setTimerState] = useState({
     gameId: initialGameId.current,
     roundIndex: 0,
     secondsLeft: SCRAMBLE_DIFFICULTIES.normal.seconds,
   });
-  const [solves, setSolves] = useState<
-    Record<number, Record<string, SolveEvent>>
-  >({});
   const [scores, setScores] = useState<Record<string, number>>({});
   const [scoreNames, setScoreNames] = useState<Record<string, string>>({});
+  const [playerProgress, setPlayerProgress] = useState<
+    Record<string, { solvedCount: number; completed: boolean }>
+  >({});
   const [feed, setFeed] = useState<string[]>([]);
   const [guess, setGuess] = useState("");
   const [feedback, setFeedback] = useState<string | null>(null);
   const [wrongAttempts, setWrongAttempts] = useState(0);
   const [hintUsed, setHintUsed] = useState(false);
+  const [displayedScramble, setDisplayedScramble] = useState("");
   const [submittedRound, setSubmittedRound] = useState<string | null>(null);
   const [copiedInvite, setCopiedInvite] = useState(false);
   const [gateView, setGateView] = useState<GateView>("mode");
@@ -377,15 +359,22 @@ export function WordScrambleRaceGame({ roomId }: { roomId?: string }) {
     activeGameId.current = event.gameId;
     processedSolves.current.clear();
     solvedPlayerRounds.current.clear();
+    skippedWordIndexes.current.clear();
+    localSolvedWordIndexes.current.clear();
     setRace({
       gameId: event.gameId,
       difficulty: event.difficulty,
       roundIndex: 0,
       wordAnswers: event.wordAnswers,
+      wordQueue: createScrambleQueue(event.wordAnswers.length),
     });
-    setSolves({});
     setScores({});
     setScoreNames({});
+    setPlayerProgress(
+      Object.fromEntries(
+        event.playerIds.map((id) => [id, { solvedCount: 0, completed: false }])
+      )
+    );
     setFeed(["The race is live. Unscramble quickly!"]);
   }, []);
 
@@ -400,31 +389,29 @@ export function WordScrambleRaceGame({ roomId }: { roomId?: string }) {
     }
     processedSolves.current.add(event.solveId);
     solvedPlayerRounds.current.add(playerRoundKey);
-    setSolves((current) => ({
-      ...current,
-      [event.roundIndex]: {
-        ...(current[event.roundIndex] || {}),
-        [event.playerId]: event,
-      },
-    }));
+    const localPlayerId = isMultiplayer
+      ? sessionStorage.getItem("word-scramble-player-id")
+      : "solo";
+    if (event.playerId === localPlayerId) {
+      localSolvedWordIndexes.current.add(event.roundIndex);
+    }
     setScores((current) => ({
       ...current,
       [event.playerId]: (current[event.playerId] || 0) + event.points,
     }));
     setScoreNames((current) => ({ ...current, [event.playerId]: event.playerName }));
+    setPlayerProgress((current) => ({
+      ...current,
+      [event.playerId]: {
+        solvedCount: event.solvedCount,
+        completed: event.completed,
+      },
+    }));
     setFeed((events) => [
       `${event.playerName} solved it · +${event.points}`,
       ...events,
     ].slice(0, 6));
-  }, []);
-
-  const applyAdvance = useCallback((event: AdvanceEvent) => {
-    setRace((current) =>
-      event.gameId === current.gameId && event.roundIndex > current.roundIndex
-        ? { ...current, roundIndex: event.roundIndex }
-        : current
-    );
-  }, []);
+  }, [isMultiplayer]);
 
   const {
     connectionState,
@@ -432,13 +419,12 @@ export function WordScrambleRaceGame({ roomId }: { roomId?: string }) {
     isHost,
     player,
     players,
-    publishAdvance,
     publishSolve,
     startEvent,
     startRoomGame,
     updatePlayerName,
     updateReady,
-  } = useWordScrambleRoom(roomId, applySolve, applyAdvance, applyStart);
+  } = useWordScrambleRoom(roomId, applySolve, applyStart);
 
   useEffect(() => {
     trackGameView("word-scramble", roomId);
@@ -448,7 +434,7 @@ export function WordScrambleRaceGame({ roomId }: { roomId?: string }) {
     if (roomId && player) trackRoomJoined("word-scramble", roomId, isHost);
   }, [isHost, player, roomId]);
 
-  const { gameId, difficulty, roundIndex, wordAnswers } = race;
+  const { gameId, difficulty, roundIndex, wordAnswers, wordQueue } = race;
   const difficultyConfig = SCRAMBLE_DIFFICULTIES[difficulty];
   const roundSeconds = difficultyConfig.seconds;
   const secondsLeft = getScrambleRoundSeconds(
@@ -461,9 +447,8 @@ export function WordScrambleRaceGame({ roomId }: { roomId?: string }) {
     () => createScrambleRounds(gameId, difficulty, ROUND_COUNT, wordAnswers),
     [difficulty, gameId, wordAnswers]
   );
-  const currentRound = rounds[roundIndex];
-  const currentSolves = solves[roundIndex] || {};
-  const isComplete = roundIndex >= rounds.length;
+  const currentWordIndex = wordQueue[roundIndex];
+  const currentRound = rounds[currentWordIndex];
   const activeRace = !isMultiplayer
     ? gateView === "playing"
     : Boolean(startEvent);
@@ -485,19 +470,38 @@ export function WordScrambleRaceGame({ roomId }: { roomId?: string }) {
   }, [isMultiplayer, players, scoreNames, startEvent]);
 
   const myPlayerId = isMultiplayer ? player?.id : "solo";
-  const playerSolved = Boolean(myPlayerId && currentSolves[myPlayerId]);
   const isActivePlayer = Boolean(
     myPlayerId && racePlayers.some((roomPlayer) => roomPlayer.id === myPlayerId)
   );
-  const solvedCount = Object.keys(currentSolves).length;
+  const myProgress = myPlayerId
+    ? playerProgress[myPlayerId] || { solvedCount: 0, completed: false }
+    : { solvedCount: 0, completed: false };
+  const completedPlayerCount = racePlayers.filter(
+    (roomPlayer) => playerProgress[roomPlayer.id]?.completed
+  ).length;
+  const isComplete =
+    activeRace &&
+    racePlayers.length > 0 &&
+    completedPlayerCount >= racePlayers.length;
+  const attemptKey = `${gameId}:${roundIndex}:${currentWordIndex}`;
+  const playerSolved =
+    submittedRound === attemptKey ||
+    (typeof currentWordIndex === "number" &&
+      localSolvedWordIndexes.current.has(currentWordIndex));
+  const canSkip =
+    typeof currentWordIndex === "number" &&
+    !skippedWordIndexes.current.has(currentWordIndex) &&
+    !playerSolved &&
+    !myProgress.completed;
 
   useEffect(() => {
-    if (!activeRace || !currentRound || isComplete) return;
+    if (!activeRace || !currentRound || myProgress.completed) return;
     setTimerState({ gameId, roundIndex, secondsLeft: roundSeconds });
     setGuess("");
     setFeedback(null);
     setWrongAttempts(0);
     setHintUsed(false);
+    setDisplayedScramble(currentRound.scrambled);
     setSubmittedRound(null);
     const interval = setInterval(() => {
       setTimerState((current) =>
@@ -507,33 +511,83 @@ export function WordScrambleRaceGame({ roomId }: { roomId?: string }) {
       );
     }, 1000);
     return () => clearInterval(interval);
-  }, [activeRace, currentRound, gameId, isComplete, roundIndex, roundSeconds]);
+  }, [activeRace, currentRound, gameId, myProgress.completed, roundIndex, roundSeconds]);
 
-  const advanceRound = useCallback(() => {
-    const nextRound = Math.min(roundIndex + 1, rounds.length);
-    if (isMultiplayer) {
-      if (isHost) publishAdvance(gameId, nextRound).catch(() => {});
-      return;
-    }
-    setRace((current) => ({ ...current, roundIndex: nextRound }));
-  }, [gameId, isHost, isMultiplayer, publishAdvance, roundIndex, rounds.length]);
+  const advancePersonalRound = useCallback(() => {
+    setRace((current) => ({
+      ...current,
+      roundIndex: Math.min(current.roundIndex + 1, current.wordQueue.length),
+    }));
+  }, []);
+
+  const recordSolvedWord = useCallback(
+    (points: number) => {
+      if (
+        !currentRound ||
+        typeof currentWordIndex !== "number" ||
+        !myPlayerId ||
+        localSolvedWordIndexes.current.has(currentWordIndex)
+      ) {
+        return;
+      }
+
+      localSolvedWordIndexes.current.add(currentWordIndex);
+      const solvedCount = localSolvedWordIndexes.current.size;
+      const completed = solvedCount >= rounds.length;
+      setSubmittedRound(attemptKey);
+      const solveEvent = {
+        gameId,
+        roundIndex: currentWordIndex,
+        points,
+        solvedCount,
+        completed,
+      };
+
+      if (!isMultiplayer) {
+        applySolve({
+          ...solveEvent,
+          solveId: createRoomId(),
+          playerId: "solo",
+          playerName: "You",
+        });
+        return;
+      }
+
+      publishSolve(solveEvent).catch(() => {
+        localSolvedWordIndexes.current.delete(currentWordIndex);
+        setSubmittedRound(null);
+        setFeedback("Your answer could not be sent. Please try again.");
+      });
+    },
+    [applySolve, attemptKey, currentRound, currentWordIndex, gameId, isMultiplayer, myPlayerId, publishSolve, rounds.length]
+  );
+
+  const skipCurrentWord = useCallback(() => {
+    if (!canSkip || typeof currentWordIndex !== "number") return;
+    skippedWordIndexes.current.add(currentWordIndex);
+    setRace((current) => ({
+      ...current,
+      wordQueue: moveScrambleWordToEnd(current.wordQueue, current.roundIndex),
+      roundIndex: current.roundIndex + 1,
+    }));
+  }, [canSkip, currentWordIndex]);
 
   useEffect(() => {
-    if (!currentRound || isComplete || secondsLeft !== 0) return;
-    setFeedback(`Time! The answer was ${currentRound.answer}.`);
-    const timer = setTimeout(advanceRound, 1400);
-    return () => clearTimeout(timer);
-  }, [advanceRound, currentRound, isComplete, secondsLeft]);
-
-  useEffect(() => {
-    if (!currentRound || isComplete || solvedCount === 0) return;
-    const everybodySolved =
-      racePlayers.length > 0 && solvedCount >= racePlayers.length;
-    if ((!isMultiplayer && playerSolved) || (isMultiplayer && isHost && everybodySolved)) {
-      const timer = setTimeout(advanceRound, 1100);
+    if (!currentRound || myProgress.completed || secondsLeft !== 0 || playerSolved) return;
+    if (canSkip) {
+      setFeedback("Time! This word moved to the end of your list.");
+      const timer = setTimeout(skipCurrentWord, 900);
       return () => clearTimeout(timer);
     }
-  }, [advanceRound, currentRound, isComplete, isHost, isMultiplayer, playerSolved, racePlayers.length, solvedCount]);
+    setFeedback(`Time! The answer was ${currentRound.answer}.`);
+    recordSolvedWord(0);
+  }, [canSkip, currentRound, myProgress.completed, playerSolved, recordSolvedWord, secondsLeft, skipCurrentWord]);
+
+  useEffect(() => {
+    if (!playerSolved) return;
+    const timer = setTimeout(advancePersonalRound, 1000);
+    return () => clearTimeout(timer);
+  }, [advancePersonalRound, playerSolved]);
 
   const sortedScores = useMemo(() => {
     const rows = new Map<string, { id: string; name: string; score: number }>();
@@ -557,7 +611,8 @@ export function WordScrambleRaceGame({ roomId }: { roomId?: string }) {
   const topScore = sortedScores[0]?.score || 0;
   const winners = sortedScores.filter((row) => row.score === topScore);
   const winnerName = winners[0]?.name || "You";
-  const winnerIsYou = !isMultiplayer || winnerName.trim().toLowerCase() === "you";
+  const winnerIsYou =
+    !isMultiplayer || winners.some((winner) => winner.id === myPlayerId);
 
   useEffect(() => {
     if (!isComplete || (isMultiplayer && !isHost)) return;
@@ -611,15 +666,18 @@ export function WordScrambleRaceGame({ roomId }: { roomId?: string }) {
     activeGameId.current = nextGameId;
     processedSolves.current.clear();
     solvedPlayerRounds.current.clear();
+    skippedWordIndexes.current.clear();
+    localSolvedWordIndexes.current.clear();
     setRace((current) => ({
       gameId: nextGameId,
       difficulty: current.difficulty,
       roundIndex: 0,
       wordAnswers: nextWords.map((entry) => entry.answer),
+      wordQueue: createScrambleQueue(nextWords.length),
     }));
-    setSolves({});
     setScores({});
     setScoreNames({});
+    setPlayerProgress({ solo: { solvedCount: 0, completed: false } });
     setFeed([]);
     setGateView("playing");
   }, [difficulty]);
@@ -651,30 +709,15 @@ export function WordScrambleRaceGame({ roomId }: { roomId?: string }) {
         secondsLeft,
         roundSeconds,
         wrongAttempts,
-        hintUsed
+        hintUsed,
+        typeof currentWordIndex === "number" &&
+          skippedWordIndexes.current.has(currentWordIndex)
       );
       setFeedback(`Solved! +${points} points`);
       setGuess(currentRound.answer);
-      setSubmittedRound(`${gameId}:${roundIndex}`);
-
-      if (!isMultiplayer) {
-        applySolve({
-          solveId: createRoomId(),
-          gameId,
-          roundIndex,
-          points,
-          playerId: "solo",
-          playerName: "You",
-        });
-        return;
-      }
-
-      publishSolve({ gameId, roundIndex, points }).catch(() => {
-        setSubmittedRound(null);
-        setFeedback("Your answer could not be sent. Please try again.");
-      });
+      recordSolvedWord(points);
     },
-    [applySolve, currentRound, gameId, guess, hintUsed, isActivePlayer, isComplete, isMultiplayer, playerSolved, publishSolve, roundIndex, roundSeconds, secondsLeft, wrongAttempts]
+    [currentRound, currentWordIndex, guess, hintUsed, isActivePlayer, isComplete, playerSolved, recordSolvedWord, roundSeconds, secondsLeft, wrongAttempts]
   );
 
   const lobbyPlayers = useMemo(() => {
@@ -868,6 +911,7 @@ export function WordScrambleRaceGame({ roomId }: { roomId?: string }) {
                 <span><strong>10</strong> words</span>
                 <span><strong>{roundSeconds}s</strong> each</span>
                 <span><strong>Speed</strong> scoring</span>
+                <span><strong>1 skip</strong> per word</span>
               </div>
               <button
                 type="button"
@@ -931,7 +975,7 @@ export function WordScrambleRaceGame({ roomId }: { roomId?: string }) {
             <div className={shell.battleRule}>
               <span>Race difficulty</span>
               <strong>{isHost ? difficultyConfig.label : "Set by host"}</strong>
-              <small>10 words · {roundSeconds} seconds each</small>
+              <small>10 words · {roundSeconds} seconds each · personal skips</small>
             </div>
 
             <div className={shell.connectionLine} role="status">
@@ -1024,12 +1068,12 @@ export function WordScrambleRaceGame({ roomId }: { roomId?: string }) {
     );
   }
 
-  const showAnswer = playerSolved || secondsLeft === 0;
+  const showAnswer = playerSolved || (secondsLeft === 0 && !canSkip);
   const answerLocked =
     playerSolved ||
-    submittedRound === `${gameId}:${roundIndex}` ||
     secondsLeft === 0 ||
     !isActivePlayer ||
+    myProgress.completed ||
     isComplete;
   const timerProgress = Math.max(
     0,
@@ -1047,7 +1091,13 @@ export function WordScrambleRaceGame({ roomId }: { roomId?: string }) {
             <p className={ui.gameEyebrow}>
               Word Scramble Race · {difficultyConfig.label}
             </p>
-            <h1>{isComplete ? "Final scores" : `Word ${roundIndex + 1} of ${rounds.length}`}</h1>
+            <h1>
+              {isComplete
+                ? "Final scores"
+                : myProgress.completed
+                  ? "You finished"
+                  : `${myProgress.solvedCount} of ${rounds.length} solved`}
+            </h1>
           </div>
         </div>
         <div className={ui.gameHeaderActions}>
@@ -1068,7 +1118,7 @@ export function WordScrambleRaceGame({ roomId }: { roomId?: string }) {
       </header>
 
       <div className={ui.raceProgress} aria-hidden="true">
-        <span style={{ width: `${Math.min(100, ((roundIndex + 1) / rounds.length) * 100)}%` }} />
+        <span style={{ width: `${Math.min(100, (myProgress.solvedCount / rounds.length) * 100)}%` }} />
       </div>
 
       {error && <div className={ui.gameError}>{error}</div>}
@@ -1092,9 +1142,27 @@ export function WordScrambleRaceGame({ roomId }: { roomId?: string }) {
               </div>
 
               <div className={ui.scramblePrompt}>
-                <p>Unscramble this word</p>
-                <div className={ui.letterTiles} aria-label={`Scrambled letters: ${currentRound.scrambled.split("").join(", ")}`}>
-                  {currentRound.scrambled.split("").map((letter, index) => (
+                <div className={ui.scrambleHeading}>
+                  <p>Unscramble this word</p>
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setDisplayedScramble((current) =>
+                        reshuffleScramble(
+                          currentRound.answer,
+                          current || currentRound.scrambled
+                        )
+                      )
+                    }
+                    disabled={answerLocked}
+                    aria-label="Reshuffle the scrambled letters"
+                  >
+                    <ShuffleIcon size={14} />
+                    Reshuffle
+                  </button>
+                </div>
+                <div className={ui.letterTiles} aria-label={`Scrambled letters: ${(displayedScramble || currentRound.scrambled).split("").join(", ")}`}>
+                  {(displayedScramble || currentRound.scrambled).split("").map((letter, index) => (
                     <span key={`${letter}-${index}`} aria-hidden="true">{letter}</span>
                   ))}
                 </div>
@@ -1135,25 +1203,39 @@ export function WordScrambleRaceGame({ roomId }: { roomId?: string }) {
                     <span>Type your answer before the timer reaches zero.</span>
                   )}
                   {hintUsed && !showAnswer && (
-                    <small>Starts with {currentRound.answer[0]} · ends with {currentRound.answer.at(-1)}</small>
+                    <small className={ui.contextualHint}>
+                      <strong>Hint:</strong>{" "}
+                      {currentRound.hint || `Starts with ${currentRound.answer[0]} · ends with ${currentRound.answer.at(-1)}`}
+                      {currentRound.reference ? <span>{currentRound.reference}</span> : null}
+                    </small>
                   )}
                 </div>
-                {!hintUsed && !showAnswer && isActivePlayer && (
-                  <button type="button" onClick={() => setHintUsed(true)}>
-                    Reveal hint <small>−150 pts</small>
-                  </button>
-                )}
-                {isMultiplayer && isHost && playerSolved && solvedCount < racePlayers.length && (
-                  <button type="button" onClick={advanceRound}>
-                    Continue <span aria-hidden="true"><ArrowIcon /></span>
-                  </button>
-                )}
+                {!showAnswer && isActivePlayer && !myProgress.completed ? (
+                  <div className={ui.answerActions}>
+                    {!hintUsed ? (
+                      <button type="button" onClick={() => setHintUsed(true)}>
+                        Reveal hint <small>−150 pts</small>
+                      </button>
+                    ) : null}
+                    <button
+                      type="button"
+                      className={ui.skipAction}
+                      onClick={skipCurrentWord}
+                      disabled={!canSkip}
+                    >
+                      Skip <small>{canSkip ? "Moves to end" : "Already used"}</small>
+                    </button>
+                  </div>
+                ) : null}
               </div>
             </>
           ) : (
             <div className={ui.completePlaceholder}>
               <span aria-hidden="true">✦</span>
-              <h2>Race complete</h2>
+              <h2>{isComplete ? "Race complete" : "You finished"}</h2>
+              {!isComplete && isMultiplayer ? (
+                <p>Waiting for the other racers to finish.</p>
+              ) : null}
             </div>
           )}
         </div>
@@ -1170,7 +1252,11 @@ export function WordScrambleRaceGame({ roomId }: { roomId?: string }) {
                   <span className={ui.rank}>{index + 1}</span>
                   <span className={ui.scoreIdentity}>
                     <strong>{row.name}</strong>
-                    <small>{index === 0 ? "Leading" : "Still racing"}</small>
+                    <small>
+                      {playerProgress[row.id]?.completed
+                        ? "Finished"
+                        : `${playerProgress[row.id]?.solvedCount || 0}/${rounds.length} solved`}
+                    </small>
                   </span>
                   <strong className={ui.score}>{row.score}</strong>
                 </div>
@@ -1180,15 +1266,19 @@ export function WordScrambleRaceGame({ roomId }: { roomId?: string }) {
 
           <section className={ui.panel}>
             <div className={ui.panelHeading}>
-              <h2>Round status</h2>
-              <span>{solvedCount}/{racePlayers.length} solved</span>
+              <h2>Race progress</h2>
+              <span>{completedPlayerCount}/{racePlayers.length} finished</span>
             </div>
             <div className={ui.racerStatus}>
               {racePlayers.map((roomPlayer) => (
                 <div key={roomPlayer.id}>
                   <span>{roomPlayer.name.slice(0, 1).toUpperCase()}</span>
                   <strong>{roomPlayer.name}</strong>
-                  <small>{currentSolves[roomPlayer.id] ? "Solved ✓" : "Thinking…"}</small>
+                  <small>
+                    {playerProgress[roomPlayer.id]?.completed
+                      ? "Finished ✓"
+                      : `${playerProgress[roomPlayer.id]?.solvedCount || 0}/${rounds.length} solved`}
+                  </small>
                 </div>
               ))}
             </div>
@@ -1231,11 +1321,12 @@ export function WordScrambleRaceGame({ roomId }: { roomId?: string }) {
                   ? `You unscrambled your way to ${topScore} points.`
                   : `${winnerName} unscrambled their way to ${topScore} points.`}
             </p>
-            <div className={ui.finalScores}>
-              {sortedScores.slice(0, 3).map((row, index) => (
-                <div key={row.id}><span>#{index + 1} {row.name}</span><strong>{row.score}</strong></div>
-              ))}
-            </div>
+            {isMultiplayer ? (
+              <FinalStandings
+                rows={sortedScores}
+                currentPlayerId={myPlayerId}
+              />
+            ) : null}
             <div className={ui.modalActions}>
               {(!isMultiplayer || isHost) ? (
                 <button type="button" className={ui.primaryModalAction} onClick={handleNewRace}>
