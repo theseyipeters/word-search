@@ -55,6 +55,15 @@ const games = [
     tone: "rose",
     description: "Drop your discs, plan ahead, and be first to connect four.",
   },
+  {
+    number: "06",
+    title: "Word Scramble Race",
+    href: "/word-scramble",
+    status: "Timed multiplayer",
+    art: ["S", "O", "L", "V"],
+    tone: "mint",
+    description: "Rearrange Bible words quickly and race to the top score.",
+  },
 ] as const;
 
 const previewLetters = [
@@ -81,7 +90,7 @@ export default function Home() {
         </Link>
         <div className={styles.navMeta}>
           <span className={styles.liveDot} aria-hidden="true" />
-          <span>5 games ready to play</span>
+          <span>6 games ready to play</span>
         </div>
       </header>
 

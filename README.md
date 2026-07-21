@@ -9,6 +9,7 @@ A multiplayer games hub built with Next.js, React, Ably, and OpenAI.
 - Memory Match
 - Trivia Battle
 - Connect Four
+- Word Scramble Race
 
 ## Environment
 

@@ -1,7 +1,7 @@
 {
   "name": "Bible Games Hub",
   "short_name": "Bible Games",
-  "description": "Play Bible-inspired games together, including Word Search, Tic Tac Toe, Memory Match, Trivia Battle, and Connect Four.",
+  "description": "Play Bible-inspired games together, including Word Search, Tic Tac Toe, Memory Match, Trivia Battle, Connect Four, and Word Scramble Race.",
   "start_url": "/",
   "scope": "/",
   "display": "standalone",
@@ -43,6 +43,13 @@
       "short_name": "Connect 4",
       "description": "Start a solo or multiplayer Connect Four match.",
       "url": "/connect-four",
+      "icons": [{ "src": "/icon-192.png", "sizes": "192x192" }]
+    },
+    {
+      "name": "Word Scramble Race",
+      "short_name": "Scramble",
+      "description": "Start a timed Bible word scramble race.",
+      "url": "/word-scramble",
       "icons": [{ "src": "/icon-192.png", "sizes": "192x192" }]
     }
   ]
