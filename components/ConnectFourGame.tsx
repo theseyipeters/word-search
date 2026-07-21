@@ -8,6 +8,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { createRoomCode } from "@/lib/useWordSearch";
 import { useTheme } from "@/lib/useTheme";
+import { ArrowIcon } from "./ArrowIcon";
 import { RoomJoinForm } from "./RoomJoinForm";
 import shell from "./TicTacToeGame.module.css";
 import ui from "./ConnectFourGame.module.css";
@@ -775,7 +776,7 @@ export function ConnectFourGame({ roomId }: { roomId?: string }) {
         />
       </Link>
       <Link href="/" className={shell.menuLink}>
-        <span aria-hidden="true">←</span> Back to menu
+        <span aria-hidden="true"><ArrowIcon direction="left" /></span> Back to menu
       </Link>
     </header>
   );
@@ -806,7 +807,7 @@ export function ConnectFourGame({ roomId }: { roomId?: string }) {
                 <strong>Solo challenge</strong>
                 <small>Play Lime against the Guidde computer.</small>
               </span>
-              <span className={shell.choiceArrow} aria-hidden="true">↗</span>
+              <span className={shell.choiceArrow} aria-hidden="true"><ArrowIcon direction="up-right" /></span>
             </button>
 
             <button
@@ -820,7 +821,7 @@ export function ConnectFourGame({ roomId }: { roomId?: string }) {
                 <strong>Multiplayer</strong>
                 <small>Create a room and trade live turns.</small>
               </span>
-              <span className={shell.choiceArrow} aria-hidden="true">↗</span>
+              <span className={shell.choiceArrow} aria-hidden="true"><ArrowIcon direction="up-right" /></span>
             </button>
           </div>
 
@@ -845,7 +846,7 @@ export function ConnectFourGame({ roomId }: { roomId?: string }) {
             className={shell.stepBack}
             onClick={() => setGateView("mode")}
           >
-            ← Change game mode
+            <ArrowIcon direction="left" /> Change game mode
           </button>
 
           <section
@@ -874,7 +875,7 @@ export function ConnectFourGame({ roomId }: { roomId?: string }) {
                 onClick={isSingleSetup ? handleStartSinglePlayer : handleCreateRoom}
               >
                 {isSingleSetup ? "Start game" : "Create room"}
-                <span aria-hidden="true">→</span>
+                <span aria-hidden="true"><ArrowIcon /></span>
               </button>
               {!isSingleSetup && <RoomJoinForm gamePath="/connect-four" />}
             </div>
@@ -1010,7 +1011,7 @@ export function ConnectFourGame({ roomId }: { roomId?: string }) {
                 onClick={() => startRoomGame(contenders[0].id, contenders[1].id)}
                 disabled={!everybodyReady}
               >
-                Start game <span aria-hidden="true">→</span>
+                Start game <span aria-hidden="true"><ArrowIcon /></span>
               </button>
             ) : (
               <div className={`${shell.guestMessage} ${ui.guestMessage}`}>
@@ -1032,7 +1033,7 @@ export function ConnectFourGame({ roomId }: { roomId?: string }) {
       <header className={ui.playHeader}>
         <div className={ui.headerLead}>
           <Link href="/" className={shell.gameMenuLink}>
-            <span aria-hidden="true">←</span> Menu
+            <span aria-hidden="true"><ArrowIcon direction="left" /></span> Menu
           </Link>
           <div>
             <p className={ui.eyebrow}>

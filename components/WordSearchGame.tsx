@@ -14,6 +14,7 @@ import {
 } from "@/lib/useWordSearch";
 import { useTheme } from "@/lib/useTheme";
 import { useTimer } from "@/lib/useTimer";
+import { ArrowIcon } from "./ArrowIcon";
 import { RoomJoinForm } from "./RoomJoinForm";
 import ui from "./WordSearchGame.module.css";
 
@@ -505,7 +506,7 @@ export function WordSearchGame({ roomId }: WordSearchGameProps) {
         />
       </Link>
       <Link href="/" className={ui.menuLink}>
-        <span aria-hidden="true">←</span> Back to menu
+        <span aria-hidden="true"><ArrowIcon direction="left" /></span> Back to menu
       </Link>
     </header>
   );
@@ -538,7 +539,7 @@ export function WordSearchGame({ roomId }: WordSearchGameProps) {
                 <strong>Single player</strong>
                 <small>Relax, focus, and beat your own time.</small>
               </span>
-              <span className={ui.choiceArrow} aria-hidden="true">↗</span>
+              <span className={ui.choiceArrow} aria-hidden="true"><ArrowIcon direction="up-right" /></span>
             </button>
 
             <button
@@ -554,7 +555,7 @@ export function WordSearchGame({ roomId }: WordSearchGameProps) {
                 <strong>Multiplayer</strong>
                 <small>Create a room and race your friends live.</small>
               </span>
-              <span className={ui.choiceArrow} aria-hidden="true">↗</span>
+              <span className={ui.choiceArrow} aria-hidden="true"><ArrowIcon direction="up-right" /></span>
             </button>
           </div>
 
@@ -579,7 +580,7 @@ export function WordSearchGame({ roomId }: WordSearchGameProps) {
             className={ui.stepBack}
             onClick={() => setGateView("mode")}
           >
-            ← Change game mode
+            <ArrowIcon direction="left" /> Change game mode
           </button>
 
           <section
@@ -608,7 +609,7 @@ export function WordSearchGame({ roomId }: WordSearchGameProps) {
                 onClick={isSingleSetup ? handleStartSinglePlayer : handleCreateRoom}
               >
                 {isSingleSetup ? "Start game" : "Create room"}
-                <span aria-hidden="true">→</span>
+                <span aria-hidden="true"><ArrowIcon /></span>
               </button>
               {!isSingleSetup && <RoomJoinForm gamePath="/word-search" />}
             </div>
@@ -738,7 +739,7 @@ export function WordSearchGame({ roomId }: WordSearchGameProps) {
                 onClick={startRoomGame}
                 disabled={!everybodyReady}
               >
-                Start game <span aria-hidden="true">→</span>
+                Start game <span aria-hidden="true"><ArrowIcon /></span>
               </button>
             ) : (
               <div className={ui.guestMessage}>
@@ -760,7 +761,7 @@ export function WordSearchGame({ roomId }: WordSearchGameProps) {
       <header style={styles.header}>
         <div style={styles.headerLeft}>
           <Link href="/" className={ui.gameMenuLink}>
-            <span aria-hidden="true">←</span> Menu
+            <span aria-hidden="true"><ArrowIcon direction="left" /></span> Menu
           </Link>
           <div>
             <h1 style={styles.title}>Word Search</h1>

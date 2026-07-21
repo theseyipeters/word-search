@@ -8,6 +8,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { createRoomCode } from "@/lib/useWordSearch";
 import { useTheme } from "@/lib/useTheme";
+import { ArrowIcon } from "./ArrowIcon";
 import { RoomJoinForm } from "./RoomJoinForm";
 import ui from "./TicTacToeGame.module.css";
 
@@ -624,7 +625,7 @@ export function TicTacToeGame({ roomId }: { roomId?: string }) {
         />
       </Link>
       <Link href="/" className={ui.menuLink}>
-        <span aria-hidden="true">←</span> Back to menu
+        <span aria-hidden="true"><ArrowIcon direction="left" /></span> Back to menu
       </Link>
     </header>
   );
@@ -659,7 +660,7 @@ export function TicTacToeGame({ roomId }: { roomId?: string }) {
                 <strong>Single player</strong>
                 <small>Play both X and O on this device.</small>
               </span>
-              <span className={ui.choiceArrow} aria-hidden="true">↗</span>
+              <span className={ui.choiceArrow} aria-hidden="true"><ArrowIcon direction="up-right" /></span>
             </button>
 
             <button
@@ -677,7 +678,7 @@ export function TicTacToeGame({ roomId }: { roomId?: string }) {
                 <strong>Multiplayer</strong>
                 <small>Create a room and take turns live.</small>
               </span>
-              <span className={ui.choiceArrow} aria-hidden="true">↗</span>
+              <span className={ui.choiceArrow} aria-hidden="true"><ArrowIcon direction="up-right" /></span>
             </button>
           </div>
 
@@ -702,7 +703,7 @@ export function TicTacToeGame({ roomId }: { roomId?: string }) {
             className={ui.stepBack}
             onClick={() => setGateView("mode")}
           >
-            ← Change game mode
+            <ArrowIcon direction="left" /> Change game mode
           </button>
 
           <section
@@ -731,7 +732,7 @@ export function TicTacToeGame({ roomId }: { roomId?: string }) {
                 onClick={isSingleSetup ? handleStartSinglePlayer : handleCreateRoom}
               >
                 {isSingleSetup ? "Start game" : "Create room"}
-                <span aria-hidden="true">→</span>
+                <span aria-hidden="true"><ArrowIcon /></span>
               </button>
               {!isSingleSetup && <RoomJoinForm gamePath="/tic-tac-toe" />}
             </div>
@@ -860,7 +861,7 @@ export function TicTacToeGame({ roomId }: { roomId?: string }) {
                 }
                 disabled={!everybodyReady}
               >
-                Start game <span aria-hidden="true">→</span>
+                Start game <span aria-hidden="true"><ArrowIcon /></span>
               </button>
             ) : (
               <div className={ui.guestMessage}>
@@ -882,7 +883,7 @@ export function TicTacToeGame({ roomId }: { roomId?: string }) {
       <header style={styles.header}>
         <div style={styles.headerLead}>
           <Link href="/" className={ui.gameMenuLink}>
-            <span aria-hidden="true">←</span> Menu
+            <span aria-hidden="true"><ArrowIcon direction="left" /></span> Menu
           </Link>
           <div>
             <p style={styles.eyebrow}>

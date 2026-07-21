@@ -16,6 +16,7 @@ import {
 } from "@/lib/wordScramble";
 import { createRoomCode, createRoomId } from "@/lib/useWordSearch";
 import { useTheme } from "@/lib/useTheme";
+import { ArrowIcon } from "./ArrowIcon";
 import { RoomJoinForm } from "./RoomJoinForm";
 import shell from "./TriviaBattleGame.module.css";
 import ui from "./WordScrambleRaceGame.module.css";
@@ -669,7 +670,7 @@ export function WordScrambleRaceGame({ roomId }: { roomId?: string }) {
         />
       </Link>
       <Link href="/" className={shell.menuLink}>
-        <span aria-hidden="true">←</span> Back to menu
+        <span aria-hidden="true"><ArrowIcon direction="left" /></span> Back to menu
       </Link>
     </header>
   );
@@ -723,7 +724,7 @@ export function WordScrambleRaceGame({ roomId }: { roomId?: string }) {
                 <strong>Single player</strong>
                 <small>Chase your best score across ten words.</small>
               </span>
-              <span className={shell.choiceArrow} aria-hidden="true">↗</span>
+              <span className={shell.choiceArrow} aria-hidden="true"><ArrowIcon direction="up-right" /></span>
             </button>
 
             <button
@@ -741,7 +742,7 @@ export function WordScrambleRaceGame({ roomId }: { roomId?: string }) {
                 <strong>Multiplayer</strong>
                 <small>Race friends on the same words in real time.</small>
               </span>
-              <span className={shell.choiceArrow} aria-hidden="true">↗</span>
+              <span className={shell.choiceArrow} aria-hidden="true"><ArrowIcon direction="up-right" /></span>
             </button>
           </div>
 
@@ -766,7 +767,7 @@ export function WordScrambleRaceGame({ roomId }: { roomId?: string }) {
             className={shell.stepBack}
             onClick={() => setGateView("mode")}
           >
-            ← Change game mode
+            <ArrowIcon direction="left" /> Change game mode
           </button>
 
           <section
@@ -796,7 +797,7 @@ export function WordScrambleRaceGame({ roomId }: { roomId?: string }) {
                 onClick={isSingleSetup ? startSingleRace : handleCreateRoom}
               >
                 {isSingleSetup ? "Start race" : "Create room"}
-                <span aria-hidden="true">→</span>
+                <span aria-hidden="true"><ArrowIcon /></span>
               </button>
               {!isSingleSetup && <RoomJoinForm gamePath="/word-scramble" />}
             </div>
@@ -931,7 +932,7 @@ export function WordScrambleRaceGame({ roomId }: { roomId?: string }) {
                 }
                 disabled={!everybodyReady}
               >
-                Start race <span aria-hidden="true">→</span>
+                Start race <span aria-hidden="true"><ArrowIcon /></span>
               </button>
             ) : (
               <div className={`${shell.guestMessage} ${ui.guestMessage}`}>
@@ -965,7 +966,7 @@ export function WordScrambleRaceGame({ roomId }: { roomId?: string }) {
       <header className={ui.gameHeader}>
         <div className={ui.gameHeaderLead}>
           <Link href="/" className={shell.gameMenuLink}>
-            <span aria-hidden="true">←</span> Menu
+            <span aria-hidden="true"><ArrowIcon direction="left" /></span> Menu
           </Link>
           <div>
             <p className={ui.gameEyebrow}>
@@ -1044,7 +1045,7 @@ export function WordScrambleRaceGame({ roomId }: { roomId?: string }) {
                     autoFocus
                   />
                   <button type="submit" disabled={answerLocked || !guess}>
-                    Lock it in <span aria-hidden="true">→</span>
+                    Lock it in <span aria-hidden="true"><ArrowIcon /></span>
                   </button>
                 </div>
               </form>
@@ -1069,7 +1070,7 @@ export function WordScrambleRaceGame({ roomId }: { roomId?: string }) {
                 )}
                 {isMultiplayer && isHost && playerSolved && solvedCount < racePlayers.length && (
                   <button type="button" onClick={advanceRound}>
-                    Continue <span aria-hidden="true">→</span>
+                    Continue <span aria-hidden="true"><ArrowIcon /></span>
                   </button>
                 )}
               </div>
