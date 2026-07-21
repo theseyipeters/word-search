@@ -8,6 +8,15 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { createRoomCode } from "@/lib/useWordSearch";
 import { useTheme } from "@/lib/useTheme";
+import {
+  trackGameCompleted,
+  trackGameStarted,
+  trackGameView,
+  trackRematchStarted,
+  trackRoomCreated,
+  trackRoomJoined,
+} from "@/lib/gameTelemetry";
+import { ArrowIcon } from "./ArrowIcon";
 import { RoomJoinForm } from "./RoomJoinForm";
 import shell from "./TicTacToeGame.module.css";
 import ui from "./ConnectFourGame.module.css";
@@ -547,6 +556,14 @@ export function ConnectFourGame({ roomId }: { roomId?: string }) {
     updateReady,
   } = useConnectFourRoom(roomId, applyMove, applyReset, applyStart);
 
+  useEffect(() => {
+    trackGameView("connect-four", roomId);
+  }, [roomId]);
+
+  useEffect(() => {
+    if (roomId && player) trackRoomJoined("connect-four", roomId, isHost);
+  }, [isHost, player, roomId]);
+
   const assignments = useMemo(() => {
     const map = new Map<string, Disc>();
     if (startEvent) {
@@ -573,6 +590,18 @@ export function ConnectFourGame({ roomId }: { roomId?: string }) {
       : displayScores.lime > displayScores.violet
         ? "lime"
         : "violet";
+
+  useEffect(() => {
+    if (!isMatchComplete || (isMultiplayer && !isHost)) return;
+    trackGameCompleted("connect-four", isMultiplayer ? "multiplayer" : "single", roomId, {
+      playerCount: isMultiplayer ? Math.max(players.length, 2) : 2,
+      winner: matchWinner || "draw",
+      limeWins: displayScores.lime,
+      violetWins: displayScores.violet,
+      draws: displayScores.draws,
+      roundsPlayed: round,
+    });
+  }, [displayScores.draws, displayScores.lime, displayScores.violet, isHost, isMatchComplete, isMultiplayer, matchWinner, players.length, roomId, round]);
   const myDisc = player ? assignments.get(player.id) : undefined;
   const isMyTurn = !isMultiplayer || myDisc === turn;
   const playerLime = players.find(
@@ -593,6 +622,7 @@ export function ConnectFourGame({ roomId }: { roomId?: string }) {
     const nextRoomId = createRoomCode();
     const roomPlayer = getOrCreatePlayer();
     sessionStorage.setItem(`connect-four-room-host:${nextRoomId}`, roomPlayer.id);
+    trackRoomCreated("connect-four", nextRoomId);
     router.push(`/connect-four/room/${nextRoomId}`);
   }, [router]);
 
@@ -608,6 +638,7 @@ export function ConnectFourGame({ roomId }: { roomId?: string }) {
   }, []);
 
   const handleStartSinglePlayer = useCallback(() => {
+    trackGameStarted("connect-four", "single", undefined, { playerCount: 2 });
     setMatch({
       board: emptyBoard(),
       round: 1,
@@ -710,6 +741,15 @@ export function ConnectFourGame({ roomId }: { roomId?: string }) {
     const nextStarter = isMatchComplete ? "lime" : otherDisc(starter);
     const nextScores = isMatchComplete ? EMPTY_SCORES : displayScores;
 
+    if (isMatchComplete && (!isMultiplayer || isHost)) {
+      trackRematchStarted(
+        "connect-four",
+        isMultiplayer ? "multiplayer" : "single",
+        roomId,
+        { playerCount: isMultiplayer ? Math.max(players.length, 2) : 2 },
+      );
+    }
+
     if (!isMultiplayer) {
       setMatch({
         board: emptyBoard(),
@@ -726,7 +766,7 @@ export function ConnectFourGame({ roomId }: { roomId?: string }) {
       return;
     }
     publishReset(nextRound, nextStarter, nextScores).catch(() => {});
-  }, [displayScores, isMatchComplete, isMultiplayer, publishReset, round, starter]);
+  }, [displayScores, isHost, isMatchComplete, isMultiplayer, players.length, publishReset, roomId, round, starter]);
 
   const statusText = winner
     ? `${discLabel(winner.disc)} connects four!`
@@ -755,6 +795,12 @@ export function ConnectFourGame({ roomId }: { roomId?: string }) {
   const contenders = lobbyPlayers.slice(0, 2);
   const everybodyReady =
     contenders.length === 2 && contenders.every((roomPlayer) => roomPlayer.ready);
+  const handleStartRoomGame = useCallback(async () => {
+    await startRoomGame(contenders[0].id, contenders[1].id);
+    trackGameStarted("connect-four", "multiplayer", roomId, {
+      playerCount: contenders.length,
+    });
+  }, [contenders, roomId, startRoomGame]);
   const waitingMessage =
     contenders.length < 2
       ? "Invite one more player to continue."
@@ -775,7 +821,7 @@ export function ConnectFourGame({ roomId }: { roomId?: string }) {
         />
       </Link>
       <Link href="/" className={shell.menuLink}>
-        <span aria-hidden="true">←</span> Back to menu
+        <span aria-hidden="true"><ArrowIcon direction="left" /></span> Back to menu
       </Link>
     </header>
   );
@@ -806,7 +852,7 @@ export function ConnectFourGame({ roomId }: { roomId?: string }) {
                 <strong>Solo challenge</strong>
                 <small>Play Lime against the Guidde computer.</small>
               </span>
-              <span className={shell.choiceArrow} aria-hidden="true">↗</span>
+              <span className={shell.choiceArrow} aria-hidden="true"><ArrowIcon direction="up-right" /></span>
             </button>
 
             <button
@@ -820,7 +866,7 @@ export function ConnectFourGame({ roomId }: { roomId?: string }) {
                 <strong>Multiplayer</strong>
                 <small>Create a room and trade live turns.</small>
               </span>
-              <span className={shell.choiceArrow} aria-hidden="true">↗</span>
+              <span className={shell.choiceArrow} aria-hidden="true"><ArrowIcon direction="up-right" /></span>
             </button>
           </div>
 
@@ -845,7 +891,7 @@ export function ConnectFourGame({ roomId }: { roomId?: string }) {
             className={shell.stepBack}
             onClick={() => setGateView("mode")}
           >
-            ← Change game mode
+            <ArrowIcon direction="left" /> Change game mode
           </button>
 
           <section
@@ -874,7 +920,7 @@ export function ConnectFourGame({ roomId }: { roomId?: string }) {
                 onClick={isSingleSetup ? handleStartSinglePlayer : handleCreateRoom}
               >
                 {isSingleSetup ? "Start game" : "Create room"}
-                <span aria-hidden="true">→</span>
+                <span aria-hidden="true"><ArrowIcon /></span>
               </button>
               {!isSingleSetup && <RoomJoinForm gamePath="/connect-four" />}
             </div>
@@ -1007,10 +1053,10 @@ export function ConnectFourGame({ roomId }: { roomId?: string }) {
               <button
                 type="button"
                 className={shell.startRoomAction}
-                onClick={() => startRoomGame(contenders[0].id, contenders[1].id)}
+                onClick={() => void handleStartRoomGame()}
                 disabled={!everybodyReady}
               >
-                Start game <span aria-hidden="true">→</span>
+                Start game <span aria-hidden="true"><ArrowIcon /></span>
               </button>
             ) : (
               <div className={`${shell.guestMessage} ${ui.guestMessage}`}>
@@ -1032,7 +1078,7 @@ export function ConnectFourGame({ roomId }: { roomId?: string }) {
       <header className={ui.playHeader}>
         <div className={ui.headerLead}>
           <Link href="/" className={shell.gameMenuLink}>
-            <span aria-hidden="true">←</span> Menu
+            <span aria-hidden="true"><ArrowIcon direction="left" /></span> Menu
           </Link>
           <div>
             <p className={ui.eyebrow}>

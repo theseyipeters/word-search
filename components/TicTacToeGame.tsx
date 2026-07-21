@@ -8,6 +8,15 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { createRoomCode } from "@/lib/useWordSearch";
 import { useTheme } from "@/lib/useTheme";
+import {
+  trackGameCompleted,
+  trackGameStarted,
+  trackGameView,
+  trackRematchStarted,
+  trackRoomCreated,
+  trackRoomJoined,
+} from "@/lib/gameTelemetry";
+import { ArrowIcon } from "./ArrowIcon";
 import { RoomJoinForm } from "./RoomJoinForm";
 import ui from "./TicTacToeGame.module.css";
 
@@ -428,6 +437,14 @@ export function TicTacToeGame({ roomId }: { roomId?: string }) {
     updateReady,
   } = useTicTacToeRoom(roomId, applyMove, applyReset, applyStart);
 
+  useEffect(() => {
+    trackGameView("tic-tac-toe", roomId);
+  }, [roomId]);
+
+  useEffect(() => {
+    if (roomId && player) trackRoomJoined("tic-tac-toe", roomId, isHost);
+  }, [isHost, player, roomId]);
+
   const assignments = useMemo(() => {
     const map = new Map<string, Mark>();
     if (startEvent) {
@@ -464,6 +481,18 @@ export function TicTacToeGame({ roomId }: { roomId?: string }) {
       : displayScores.X > displayScores.O
         ? "X"
         : "O";
+
+  useEffect(() => {
+    if (!isMatchComplete || (isMultiplayer && !isHost)) return;
+    trackGameCompleted("tic-tac-toe", isMultiplayer ? "multiplayer" : "single", roomId, {
+      playerCount: isMultiplayer ? Math.max(players.length, 2) : 2,
+      winner: matchWinner || "draw",
+      xWins: displayScores.X,
+      oWins: displayScores.O,
+      draws: displayScores.draws,
+      roundsPlayed: roundNumber,
+    });
+  }, [displayScores.O, displayScores.X, displayScores.draws, isHost, isMatchComplete, isMultiplayer, matchWinner, players.length, roomId, roundNumber]);
   const strikeClass = winner
     ? {
         "0,1,2": ui.strikeRowTop,
@@ -492,6 +521,7 @@ export function TicTacToeGame({ roomId }: { roomId?: string }) {
     const nextRoomId = createRoomCode();
     const roomPlayer = getOrCreatePlayer();
     sessionStorage.setItem(`tic-tac-toe-room-host:${nextRoomId}`, roomPlayer.id);
+    trackRoomCreated("tic-tac-toe", nextRoomId);
     router.push(`/tic-tac-toe/room/${nextRoomId}`);
   }, [router]);
 
@@ -503,6 +533,7 @@ export function TicTacToeGame({ roomId }: { roomId?: string }) {
   }, []);
 
   const handleStartSinglePlayer = useCallback(() => {
+    trackGameStarted("tic-tac-toe", "single", undefined, { playerCount: 2 });
     setMatch({
       board: Array(9).fill(null),
       round: 1,
@@ -552,6 +583,14 @@ export function TicTacToeGame({ roomId }: { roomId?: string }) {
     const nextScores: ScoreState = isMatchComplete
       ? { X: 0, O: 0, draws: 0 }
       : displayScores;
+    if (isMatchComplete && (!isMultiplayer || isHost)) {
+      trackRematchStarted(
+        "tic-tac-toe",
+        isMultiplayer ? "multiplayer" : "single",
+        roomId,
+        { playerCount: isMultiplayer ? Math.max(players.length, 2) : 2 },
+      );
+    }
     if (!isMultiplayer) {
       setMatch({
         board: Array(9).fill(null),
@@ -571,9 +610,12 @@ export function TicTacToeGame({ roomId }: { roomId?: string }) {
     publishReset(nextRound, nextStarter, nextScores).catch(() => {});
   }, [
     displayScores,
+    isHost,
     isMatchComplete,
     isMultiplayer,
+    players.length,
     publishReset,
+    roomId,
     roundNumber,
     startingMark,
   ]);
@@ -604,6 +646,12 @@ export function TicTacToeGame({ roomId }: { roomId?: string }) {
   }, [player, players]);
   const everybodyReady =
     lobbyPlayers.length >= 2 && lobbyPlayers.every((roomPlayer) => roomPlayer.ready);
+  const handleStartRoomGame = useCallback(async () => {
+    await startRoomGame(lobbyPlayers[0].id, lobbyPlayers[1].id);
+    trackGameStarted("tic-tac-toe", "multiplayer", roomId, {
+      playerCount: lobbyPlayers.length,
+    });
+  }, [lobbyPlayers, roomId, startRoomGame]);
   const waitingMessage =
     lobbyPlayers.length < 2
       ? "Invite one more player to continue."
@@ -624,7 +672,7 @@ export function TicTacToeGame({ roomId }: { roomId?: string }) {
         />
       </Link>
       <Link href="/" className={ui.menuLink}>
-        <span aria-hidden="true">←</span> Back to menu
+        <span aria-hidden="true"><ArrowIcon direction="left" /></span> Back to menu
       </Link>
     </header>
   );
@@ -659,7 +707,7 @@ export function TicTacToeGame({ roomId }: { roomId?: string }) {
                 <strong>Single player</strong>
                 <small>Play both X and O on this device.</small>
               </span>
-              <span className={ui.choiceArrow} aria-hidden="true">↗</span>
+              <span className={ui.choiceArrow} aria-hidden="true"><ArrowIcon direction="up-right" /></span>
             </button>
 
             <button
@@ -677,7 +725,7 @@ export function TicTacToeGame({ roomId }: { roomId?: string }) {
                 <strong>Multiplayer</strong>
                 <small>Create a room and take turns live.</small>
               </span>
-              <span className={ui.choiceArrow} aria-hidden="true">↗</span>
+              <span className={ui.choiceArrow} aria-hidden="true"><ArrowIcon direction="up-right" /></span>
             </button>
           </div>
 
@@ -702,7 +750,7 @@ export function TicTacToeGame({ roomId }: { roomId?: string }) {
             className={ui.stepBack}
             onClick={() => setGateView("mode")}
           >
-            ← Change game mode
+            <ArrowIcon direction="left" /> Change game mode
           </button>
 
           <section
@@ -731,7 +779,7 @@ export function TicTacToeGame({ roomId }: { roomId?: string }) {
                 onClick={isSingleSetup ? handleStartSinglePlayer : handleCreateRoom}
               >
                 {isSingleSetup ? "Start game" : "Create room"}
-                <span aria-hidden="true">→</span>
+                <span aria-hidden="true"><ArrowIcon /></span>
               </button>
               {!isSingleSetup && <RoomJoinForm gamePath="/tic-tac-toe" />}
             </div>
@@ -855,12 +903,10 @@ export function TicTacToeGame({ roomId }: { roomId?: string }) {
               <button
                 type="button"
                 className={ui.startRoomAction}
-                onClick={() =>
-                  startRoomGame(lobbyPlayers[0].id, lobbyPlayers[1].id)
-                }
+                onClick={() => void handleStartRoomGame()}
                 disabled={!everybodyReady}
               >
-                Start game <span aria-hidden="true">→</span>
+                Start game <span aria-hidden="true"><ArrowIcon /></span>
               </button>
             ) : (
               <div className={ui.guestMessage}>
@@ -882,7 +928,7 @@ export function TicTacToeGame({ roomId }: { roomId?: string }) {
       <header style={styles.header}>
         <div style={styles.headerLead}>
           <Link href="/" className={ui.gameMenuLink}>
-            <span aria-hidden="true">←</span> Menu
+            <span aria-hidden="true"><ArrowIcon direction="left" /></span> Menu
           </Link>
           <div>
             <p style={styles.eyebrow}>

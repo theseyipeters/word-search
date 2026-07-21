@@ -7,6 +7,15 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { createRoomCode, createRoomId } from "@/lib/useWordSearch";
 import { useTheme } from "@/lib/useTheme";
+import {
+  trackGameCompleted,
+  trackGameStarted,
+  trackGameView,
+  trackRematchStarted,
+  trackRoomCreated,
+  trackRoomJoined,
+} from "@/lib/gameTelemetry";
+import { ArrowIcon } from "./ArrowIcon";
 import { RoomJoinForm } from "./RoomJoinForm";
 import ui from "./TriviaBattleGame.module.css";
 
@@ -468,6 +477,14 @@ export function TriviaBattleGame({ roomId }: { roomId?: string }) {
     updateReady,
   } = useTriviaRoom(roomId, applyAnswer, applyAdvance, applyReset, applyStart);
 
+  useEffect(() => {
+    trackGameView("trivia-battle", roomId);
+  }, [roomId]);
+
+  useEffect(() => {
+    if (roomId && player) trackRoomJoined("trivia-battle", roomId, isHost);
+  }, [isHost, player, roomId]);
+
   const activeBattle = !isMultiplayer
     ? gateView === "playing"
     : Boolean(startEvent);
@@ -602,6 +619,19 @@ export function TriviaBattleGame({ roomId }: { roomId?: string }) {
 
   const topScore = sortedScores[0]?.score || 0;
   const winners = sortedScores.filter((row) => row.score === topScore);
+  const winnerName = winners[0]?.name || "You";
+  const winnerIsYou = !isMultiplayer || winnerName.trim().toLowerCase() === "you";
+
+  useEffect(() => {
+    if (!isComplete || (isMultiplayer && !isHost)) return;
+    trackGameCompleted("trivia-battle", isMultiplayer ? "multiplayer" : "single", roomId, {
+      playerCount: isMultiplayer ? Math.max(battlePlayers.length, 1) : 1,
+      difficulty,
+      questionsAnswered: questions.length,
+      topScore,
+      tied: winners.length > 1,
+    });
+  }, [battlePlayers.length, difficulty, isComplete, isHost, isMultiplayer, questions.length, roomId, topScore, winners.length]);
   const connectionLabel = !isMultiplayer
     ? null
     : error
@@ -614,6 +644,7 @@ export function TriviaBattleGame({ roomId }: { roomId?: string }) {
     const nextRoomId = createRoomCode();
     const roomPlayer = getOrCreatePlayer();
     sessionStorage.setItem(`trivia-battle-room-host:${nextRoomId}`, roomPlayer.id);
+    trackRoomCreated("trivia-battle", nextRoomId);
     router.push(`/trivia-battle/room/${nextRoomId}?difficulty=${difficulty}`);
   }, [difficulty, router]);
 
@@ -625,6 +656,10 @@ export function TriviaBattleGame({ roomId }: { roomId?: string }) {
   }, []);
 
   const handleStartSinglePlayer = useCallback(() => {
+    trackGameStarted("trivia-battle", "single", undefined, {
+      playerCount: 1,
+      difficulty,
+    });
     setGameId(createRoomId());
     setQuestions([]);
     setQuestionIndex(0);
@@ -633,7 +668,7 @@ export function TriviaBattleGame({ roomId }: { roomId?: string }) {
     setScores({});
     setFeed([]);
     setGateView("playing");
-  }, []);
+  }, [difficulty]);
 
   const handleAnswer = useCallback(
     (selectedIndex: number) => {
@@ -672,12 +707,23 @@ export function TriviaBattleGame({ roomId }: { roomId?: string }) {
   }, [isHost, isMultiplayer, publishAdvance, questionIndex, questions.length]);
 
   const handleReset = useCallback(() => {
+    if (!isMultiplayer || isHost) {
+      trackRematchStarted(
+        "trivia-battle",
+        isMultiplayer ? "multiplayer" : "single",
+        roomId,
+        {
+          playerCount: isMultiplayer ? Math.max(battlePlayers.length, 1) : 1,
+          difficulty,
+        },
+      );
+    }
     if (!isMultiplayer) {
       applyReset({ resetId: createRoomId(), playerName: "You" });
       return;
     }
     if (isHost) publishReset().catch(() => {});
-  }, [applyReset, isHost, isMultiplayer, publishReset]);
+  }, [applyReset, battlePlayers.length, difficulty, isHost, isMultiplayer, publishReset, roomId]);
 
   const lobbyPlayers = useMemo(() => {
     const byId = new Map(players.map((roomPlayer) => [roomPlayer.id, roomPlayer]));
@@ -689,6 +735,13 @@ export function TriviaBattleGame({ roomId }: { roomId?: string }) {
   }, [player, players]);
   const everybodyReady =
     lobbyPlayers.length >= 2 && lobbyPlayers.every((roomPlayer) => roomPlayer.ready);
+  const handleStartRoomGame = useCallback(async () => {
+    await startRoomGame(difficulty, lobbyPlayers.map((roomPlayer) => roomPlayer.id));
+    trackGameStarted("trivia-battle", "multiplayer", roomId, {
+      playerCount: lobbyPlayers.length,
+      difficulty,
+    });
+  }, [difficulty, lobbyPlayers, roomId, startRoomGame]);
   const waitingMessage =
     lobbyPlayers.length < 2
       ? "Invite at least one more player to continue."
@@ -709,7 +762,7 @@ export function TriviaBattleGame({ roomId }: { roomId?: string }) {
         />
       </Link>
       <Link href="/" className={ui.menuLink}>
-        <span aria-hidden="true">←</span> Back to menu
+        <span aria-hidden="true"><ArrowIcon direction="left" /></span> Back to menu
       </Link>
     </header>
   );
@@ -758,7 +811,7 @@ export function TriviaBattleGame({ roomId }: { roomId?: string }) {
                 <strong>Single player</strong>
                 <small>Test yourself through a ten-question battle.</small>
               </span>
-              <span className={ui.choiceArrow} aria-hidden="true">↗</span>
+              <span className={ui.choiceArrow} aria-hidden="true"><ArrowIcon direction="up-right" /></span>
             </button>
 
             <button
@@ -774,7 +827,7 @@ export function TriviaBattleGame({ roomId }: { roomId?: string }) {
                 <strong>Multiplayer</strong>
                 <small>Answer together and race for the highest score.</small>
               </span>
-              <span className={ui.choiceArrow} aria-hidden="true">↗</span>
+              <span className={ui.choiceArrow} aria-hidden="true"><ArrowIcon direction="up-right" /></span>
             </button>
           </div>
 
@@ -795,7 +848,7 @@ export function TriviaBattleGame({ roomId }: { roomId?: string }) {
         {gateNavigation}
         <main className={ui.setupGate}>
           <button type="button" className={ui.stepBack} onClick={() => setGateView("mode")}>
-            ← Change game mode
+            <ArrowIcon direction="left" /> Change game mode
           </button>
 
           <section className={`${ui.setupCard} ${isSingleSetup ? ui.singleSetup : ui.multiplayerSetup}`}>
@@ -819,7 +872,7 @@ export function TriviaBattleGame({ roomId }: { roomId?: string }) {
                 onClick={isSingleSetup ? handleStartSinglePlayer : handleCreateRoom}
               >
                 {isSingleSetup ? "Start battle" : "Create room"}
-                <span aria-hidden="true">→</span>
+                <span aria-hidden="true"><ArrowIcon /></span>
               </button>
               {!isSingleSetup && <RoomJoinForm gamePath="/trivia-battle" />}
             </div>
@@ -940,10 +993,10 @@ export function TriviaBattleGame({ roomId }: { roomId?: string }) {
               <button
                 type="button"
                 className={ui.startRoomAction}
-                onClick={() => startRoomGame(difficulty, lobbyPlayers.map((roomPlayer) => roomPlayer.id))}
+                onClick={() => void handleStartRoomGame()}
                 disabled={!everybodyReady}
               >
-                Start battle <span aria-hidden="true">→</span>
+                Start battle <span aria-hidden="true"><ArrowIcon /></span>
               </button>
             ) : (
               <div className={ui.guestMessage}>
@@ -975,7 +1028,7 @@ export function TriviaBattleGame({ roomId }: { roomId?: string }) {
       <header className={ui.gameHeader}>
         <div className={ui.gameHeaderLead}>
           <Link href="/" className={ui.gameMenuLink}>
-            <span aria-hidden="true">←</span> Menu
+            <span aria-hidden="true"><ArrowIcon direction="left" /></span> Menu
           </Link>
           <div>
             <p className={ui.gameEyebrow}>
@@ -1061,12 +1114,12 @@ export function TriviaBattleGame({ roomId }: { roomId?: string }) {
                 <span>{canShowAnswer ? currentQuestion.reference : "Choose one answer"}</span>
                 {!isMultiplayer && playerAnswered && (
                   <button type="button" onClick={handleNext}>
-                    Next question <span aria-hidden="true">→</span>
+                    Next question <span aria-hidden="true"><ArrowIcon /></span>
                   </button>
                 )}
                 {isMultiplayer && isHost && playerAnswered && answeredCount < battlePlayers.length && (
                   <button type="button" onClick={handleNext}>
-                    Continue <span aria-hidden="true">→</span>
+                    Continue <span aria-hidden="true"><ArrowIcon /></span>
                   </button>
                 )}
                 {isMultiplayer && playerAnswered && !isHost && (
@@ -1091,7 +1144,7 @@ export function TriviaBattleGame({ roomId }: { roomId?: string }) {
                   className={ui.retryGeneration}
                   onClick={() => setQuestionRetry((current) => current + 1)}
                 >
-                  Try again <span aria-hidden="true">→</span>
+                  Try again <span aria-hidden="true"><ArrowIcon /></span>
                 </button>
               )}
             </div>
@@ -1141,11 +1194,19 @@ export function TriviaBattleGame({ roomId }: { roomId?: string }) {
           <div className={ui.modal}>
             <p>Battle complete</p>
             <span className={ui.trophy} aria-hidden="true">✦</span>
-            <h2>{winners.length > 1 ? "A close draw!" : `${winners[0]?.name || "You"} wins!`}</h2>
+            <h2>
+              {winners.length > 1
+                ? "A close draw!"
+                : winnerIsYou
+                  ? "You win!"
+                  : `${winnerName} wins!`}
+            </h2>
             <p className={ui.modalSummary}>
               {winners.length > 1
                 ? `${winners.map((winner) => winner.name).join(" and ")} finish level on ${topScore} points.`
-                : `${winners[0]?.name || "You"} finishes on top with ${topScore} points.`}
+                : winnerIsYou
+                  ? `You finish on top with ${topScore} points.`
+                  : `${winnerName} finishes on top with ${topScore} points.`}
             </p>
             <div className={ui.finalScores}>
               {sortedScores.slice(0, 3).map((row, index) => (

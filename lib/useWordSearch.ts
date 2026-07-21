@@ -1,4 +1,9 @@
 import { useState, useCallback, useRef } from "react";
+import {
+  getBibleWords,
+  selectBibleWords,
+  takeBibleWordCycle,
+} from "@/lib/bibleWords";
 
 export type Direction = [number, number];
 export type Position = { row: number; col: number };
@@ -20,7 +25,7 @@ const DIRECTIONS: Direction[] = [
   [1, -1],
 ];
 
-const WORDS_PER_GAME = 20;
+export const WORDS_PER_GAME = 20;
 const WORD_BANK = [
   "ABRAHAM", "ADAM", "ALTAR", "AMEN", "ANGEL", "ANOINT", "APOSTLE", "ARK", "BAPTISM", "BARNABAS",
   "BETHANY", "BETHEL", "BIBLE", "BLESSED", "BLESSING", "CALEB", "CALVARY", "CANAAN", "CHURCH", "COMMAND",
@@ -137,9 +142,15 @@ function generateGrid(words: string[], random: RandomSource = Math.random): {
   return { grid, placed };
 }
 
-function puzzleFromSeed(seed?: string) {
+function puzzleFromSeed(seed?: string, answers?: string[]) {
   const random = seed ? seededRandom(seed) : Math.random;
-  const words = shuffle(WORD_BANK, random).slice(0, WORDS_PER_GAME);
+  const words = answers?.length
+    ? getBibleWords(answers).map((entry) => entry.answer)
+    : selectBibleWords({
+        seed: seed || createRoomId(),
+        count: WORDS_PER_GAME,
+        maxLength: GRID_SIZE,
+      }).map((entry) => entry.answer);
   return {
     words,
     ...generateGrid(words, random),
@@ -297,9 +308,18 @@ export function useWordSearch(options: WordSearchOptions = {}) {
     setSelectedCells(new Set());
   }, [selecting, selStart, selEnd, grid, placed, foundWords, markWordFound, options]);
 
-  const newGame = useCallback(() => {
+  const newGame = useCallback((answers?: string[], seed?: string) => {
     seedRef.current = undefined;
-    setPuzzle(puzzleFromSeed());
+    const nextSeed = seed || createRoomId();
+    const nextAnswers = answers?.length
+      ? answers
+      : takeBibleWordCycle({
+          game: "word-search",
+          seed: nextSeed,
+          count: WORDS_PER_GAME,
+          maxLength: GRID_SIZE,
+        }).map((entry) => entry.answer);
+    setPuzzle(puzzleFromSeed(nextSeed, nextAnswers));
     setFoundWords(new Set());
     setFoundCells(new Set());
     setFoundBy({});

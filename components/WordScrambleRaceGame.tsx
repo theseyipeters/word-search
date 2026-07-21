@@ -15,7 +15,17 @@ import {
   type ScrambleDifficulty,
 } from "@/lib/wordScramble";
 import { createRoomCode, createRoomId } from "@/lib/useWordSearch";
+import { takeBibleWordCycle } from "@/lib/bibleWords";
 import { useTheme } from "@/lib/useTheme";
+import {
+  trackGameCompleted,
+  trackGameEvent,
+  trackGameStarted,
+  trackGameView,
+  trackRoomCreated,
+  trackRoomJoined,
+} from "@/lib/gameTelemetry";
+import { ArrowIcon } from "./ArrowIcon";
 import { RoomJoinForm } from "./RoomJoinForm";
 import shell from "./TriviaBattleGame.module.css";
 import ui from "./WordScrambleRaceGame.module.css";
@@ -46,6 +56,7 @@ type StartEvent = {
   gameId: string;
   difficulty: ScrambleDifficulty;
   playerIds: string[];
+  wordAnswers: string[];
 };
 
 type GateView = "mode" | "single-setup" | "multiplayer-setup" | "playing";
@@ -150,7 +161,9 @@ function useWordScrambleRoom(
           typeof data.gameId === "string" &&
           isDifficulty(data.difficulty) &&
           Array.isArray(data.playerIds) &&
-          data.playerIds.every((id) => typeof id === "string")
+          data.playerIds.every((id) => typeof id === "string") &&
+          Array.isArray(data.wordAnswers) &&
+          data.wordAnswers.every((answer) => typeof answer === "string")
         ) {
           const start = data as StartEvent;
           setStartEvent(start);
@@ -292,12 +305,17 @@ function useWordScrambleRoom(
   );
 
   const startRoomGame = useCallback(
-    async (difficulty: ScrambleDifficulty, playerIds: string[]) => {
+    async (
+      difficulty: ScrambleDifficulty,
+      playerIds: string[],
+      wordAnswers: string[]
+    ) => {
       if (!channel || !isHost) return;
       await channel.publish("game-started", {
         gameId: createRoomId(),
         difficulty,
         playerIds,
+        wordAnswers,
       } satisfies StartEvent);
     },
     [channel, isHost]
@@ -329,6 +347,7 @@ export function WordScrambleRaceGame({ roomId }: { roomId?: string }) {
     gameId: string;
     difficulty: ScrambleDifficulty;
     roundIndex: number;
+    wordAnswers?: string[];
   }>({
     gameId: initialGameId.current,
     difficulty: getInitialDifficulty(),
@@ -362,6 +381,7 @@ export function WordScrambleRaceGame({ roomId }: { roomId?: string }) {
       gameId: event.gameId,
       difficulty: event.difficulty,
       roundIndex: 0,
+      wordAnswers: event.wordAnswers,
     });
     setSolves({});
     setScores({});
@@ -420,7 +440,15 @@ export function WordScrambleRaceGame({ roomId }: { roomId?: string }) {
     updateReady,
   } = useWordScrambleRoom(roomId, applySolve, applyAdvance, applyStart);
 
-  const { gameId, difficulty, roundIndex } = race;
+  useEffect(() => {
+    trackGameView("word-scramble", roomId);
+  }, [roomId]);
+
+  useEffect(() => {
+    if (roomId && player) trackRoomJoined("word-scramble", roomId, isHost);
+  }, [isHost, player, roomId]);
+
+  const { gameId, difficulty, roundIndex, wordAnswers } = race;
   const difficultyConfig = SCRAMBLE_DIFFICULTIES[difficulty];
   const roundSeconds = difficultyConfig.seconds;
   const secondsLeft = getScrambleRoundSeconds(
@@ -430,8 +458,8 @@ export function WordScrambleRaceGame({ roomId }: { roomId?: string }) {
     roundSeconds
   );
   const rounds = useMemo(
-    () => createScrambleRounds(gameId, difficulty, ROUND_COUNT),
-    [difficulty, gameId]
+    () => createScrambleRounds(gameId, difficulty, ROUND_COUNT, wordAnswers),
+    [difficulty, gameId, wordAnswers]
   );
   const currentRound = rounds[roundIndex];
   const currentSolves = solves[roundIndex] || {};
@@ -530,6 +558,17 @@ export function WordScrambleRaceGame({ roomId }: { roomId?: string }) {
   const winners = sortedScores.filter((row) => row.score === topScore);
   const winnerName = winners[0]?.name || "You";
   const winnerIsYou = !isMultiplayer || winnerName.trim().toLowerCase() === "you";
+
+  useEffect(() => {
+    if (!isComplete || (isMultiplayer && !isHost)) return;
+    trackGameCompleted("word-scramble", isMultiplayer ? "multiplayer" : "single", roomId, {
+      playerCount: isMultiplayer ? Math.max(racePlayers.length, 1) : 1,
+      difficulty,
+      roundsPlayed: rounds.length,
+      topScore,
+      tied: winners.length > 1,
+    });
+  }, [difficulty, isComplete, isHost, isMultiplayer, racePlayers.length, roomId, rounds.length, topScore, winners.length]);
   const connectionLabel = !isMultiplayer
     ? null
     : error
@@ -542,6 +581,7 @@ export function WordScrambleRaceGame({ roomId }: { roomId?: string }) {
     const nextRoomId = createRoomCode();
     const roomPlayer = getOrCreatePlayer();
     sessionStorage.setItem(`word-scramble-room-host:${nextRoomId}`, roomPlayer.id);
+    trackRoomCreated("word-scramble", nextRoomId);
     router.push(`/word-scramble/room/${nextRoomId}?difficulty=${difficulty}`);
   }, [difficulty, router]);
 
@@ -557,7 +597,17 @@ export function WordScrambleRaceGame({ roomId }: { roomId?: string }) {
   }, []);
 
   const startSingleRace = useCallback(() => {
+    trackGameStarted("word-scramble", "single", undefined, {
+      playerCount: 1,
+      difficulty,
+    });
     const nextGameId = createRoomId();
+    const nextWords = takeBibleWordCycle({
+      game: "word-scramble",
+      seed: nextGameId,
+      difficulty,
+      count: ROUND_COUNT,
+    });
     activeGameId.current = nextGameId;
     processedSolves.current.clear();
     solvedPlayerRounds.current.clear();
@@ -565,13 +615,14 @@ export function WordScrambleRaceGame({ roomId }: { roomId?: string }) {
       gameId: nextGameId,
       difficulty: current.difficulty,
       roundIndex: 0,
+      wordAnswers: nextWords.map((entry) => entry.answer),
     }));
     setSolves({});
     setScores({});
     setScoreNames({});
     setFeed([]);
     setGateView("playing");
-  }, []);
+  }, [difficulty]);
 
   const handleSubmit = useCallback(
     (event: React.FormEvent<HTMLFormElement>) => {
@@ -636,6 +687,25 @@ export function WordScrambleRaceGame({ roomId }: { roomId?: string }) {
   }, [player, players]);
   const everybodyReady =
     lobbyPlayers.length >= 2 && lobbyPlayers.every((roomPlayer) => roomPlayer.ready);
+
+  const beginRoomRace = useCallback(async (playerIds: string[]) => {
+    const nextGameId = createRoomId();
+    const nextWords = takeBibleWordCycle({
+      game: "word-scramble",
+      seed: nextGameId,
+      difficulty,
+      count: ROUND_COUNT,
+    });
+    await startRoomGame(
+      difficulty,
+      playerIds,
+      nextWords.map((entry) => entry.answer)
+    );
+    trackGameStarted("word-scramble", "multiplayer", roomId, {
+      playerCount: playerIds.length,
+      difficulty,
+    });
+  }, [difficulty, roomId, startRoomGame]);
   const waitingMessage =
     lobbyPlayers.length < 2
       ? "Invite at least one more player to continue."
@@ -645,6 +715,10 @@ export function WordScrambleRaceGame({ roomId }: { roomId?: string }) {
 
   const handleNewRace = useCallback(() => {
     if (!isMultiplayer) {
+      trackGameEvent("word-scramble", "rematch_started", {
+        mode: "single",
+        properties: { playerCount: 1, difficulty },
+      });
       startSingleRace();
       return;
     }
@@ -653,8 +727,13 @@ export function WordScrambleRaceGame({ roomId }: { roomId?: string }) {
       lobbyPlayers.length > 0
         ? lobbyPlayers.map((roomPlayer) => roomPlayer.id)
         : startEvent?.playerIds || [];
-    startRoomGame(difficulty, playerIds).catch(() => {});
-  }, [difficulty, isHost, isMultiplayer, lobbyPlayers, startEvent, startRoomGame, startSingleRace]);
+    trackGameEvent("word-scramble", "rematch_started", {
+      mode: "multiplayer",
+      roomId,
+      properties: { playerCount: playerIds.length, difficulty },
+    });
+    beginRoomRace(playerIds).catch(() => {});
+  }, [beginRoomRace, difficulty, isHost, isMultiplayer, lobbyPlayers, roomId, startEvent, startSingleRace]);
 
   const gateNavigation = (
     <header className={shell.gateNav}>
@@ -669,7 +748,7 @@ export function WordScrambleRaceGame({ roomId }: { roomId?: string }) {
         />
       </Link>
       <Link href="/" className={shell.menuLink}>
-        <span aria-hidden="true">←</span> Back to menu
+        <span aria-hidden="true"><ArrowIcon direction="left" /></span> Back to menu
       </Link>
     </header>
   );
@@ -723,7 +802,7 @@ export function WordScrambleRaceGame({ roomId }: { roomId?: string }) {
                 <strong>Single player</strong>
                 <small>Chase your best score across ten words.</small>
               </span>
-              <span className={shell.choiceArrow} aria-hidden="true">↗</span>
+              <span className={shell.choiceArrow} aria-hidden="true"><ArrowIcon direction="up-right" /></span>
             </button>
 
             <button
@@ -741,7 +820,7 @@ export function WordScrambleRaceGame({ roomId }: { roomId?: string }) {
                 <strong>Multiplayer</strong>
                 <small>Race friends on the same words in real time.</small>
               </span>
-              <span className={shell.choiceArrow} aria-hidden="true">↗</span>
+              <span className={shell.choiceArrow} aria-hidden="true"><ArrowIcon direction="up-right" /></span>
             </button>
           </div>
 
@@ -766,7 +845,7 @@ export function WordScrambleRaceGame({ roomId }: { roomId?: string }) {
             className={shell.stepBack}
             onClick={() => setGateView("mode")}
           >
-            ← Change game mode
+            <ArrowIcon direction="left" /> Change game mode
           </button>
 
           <section
@@ -796,7 +875,7 @@ export function WordScrambleRaceGame({ roomId }: { roomId?: string }) {
                 onClick={isSingleSetup ? startSingleRace : handleCreateRoom}
               >
                 {isSingleSetup ? "Start race" : "Create room"}
-                <span aria-hidden="true">→</span>
+                <span aria-hidden="true"><ArrowIcon /></span>
               </button>
               {!isSingleSetup && <RoomJoinForm gamePath="/word-scramble" />}
             </div>
@@ -924,14 +1003,11 @@ export function WordScrambleRaceGame({ roomId }: { roomId?: string }) {
                 type="button"
                 className={shell.startRoomAction}
                 onClick={() =>
-                  startRoomGame(
-                    difficulty,
-                    lobbyPlayers.map((roomPlayer) => roomPlayer.id)
-                  )
+                  void beginRoomRace(lobbyPlayers.map((roomPlayer) => roomPlayer.id))
                 }
                 disabled={!everybodyReady}
               >
-                Start race <span aria-hidden="true">→</span>
+                Start race <span aria-hidden="true"><ArrowIcon /></span>
               </button>
             ) : (
               <div className={`${shell.guestMessage} ${ui.guestMessage}`}>
@@ -965,7 +1041,7 @@ export function WordScrambleRaceGame({ roomId }: { roomId?: string }) {
       <header className={ui.gameHeader}>
         <div className={ui.gameHeaderLead}>
           <Link href="/" className={shell.gameMenuLink}>
-            <span aria-hidden="true">←</span> Menu
+            <span aria-hidden="true"><ArrowIcon direction="left" /></span> Menu
           </Link>
           <div>
             <p className={ui.gameEyebrow}>
@@ -1044,7 +1120,7 @@ export function WordScrambleRaceGame({ roomId }: { roomId?: string }) {
                     autoFocus
                   />
                   <button type="submit" disabled={answerLocked || !guess}>
-                    Lock it in <span aria-hidden="true">→</span>
+                    Lock it in <span aria-hidden="true"><ArrowIcon /></span>
                   </button>
                 </div>
               </form>
@@ -1069,7 +1145,7 @@ export function WordScrambleRaceGame({ roomId }: { roomId?: string }) {
                 )}
                 {isMultiplayer && isHost && playerSolved && solvedCount < racePlayers.length && (
                   <button type="button" onClick={advanceRound}>
-                    Continue <span aria-hidden="true">→</span>
+                    Continue <span aria-hidden="true"><ArrowIcon /></span>
                   </button>
                 )}
               </div>

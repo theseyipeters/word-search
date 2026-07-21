@@ -8,6 +8,15 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { createRoomCode, createRoomId } from "@/lib/useWordSearch";
 import { useTheme } from "@/lib/useTheme";
+import {
+  trackGameCompleted,
+  trackGameStarted,
+  trackGameView,
+  trackRematchStarted,
+  trackRoomCreated,
+  trackRoomJoined,
+} from "@/lib/gameTelemetry";
+import { ArrowIcon } from "./ArrowIcon";
 import { RoomJoinForm } from "./RoomJoinForm";
 import ui from "./MemoryMatchGame.module.css";
 
@@ -496,6 +505,14 @@ export function MemoryMatchGame({ roomId }: { roomId?: string }) {
     updateReady,
   } = useMemoryRoom(roomId, applyFlip, applyReset, applyStart);
 
+  useEffect(() => {
+    trackGameView("memory-match", roomId);
+  }, [roomId]);
+
+  useEffect(() => {
+    if (roomId && player) trackRoomJoined("memory-match", roomId, isHost);
+  }, [isHost, player, roomId]);
+
   const localPlayers = useMemo(
     () => [
       { id: "local-1", name: "You", ready: true, isHost: true },
@@ -550,6 +567,16 @@ export function MemoryMatchGame({ roomId }: { roomId?: string }) {
   const winningNames = scoreRows
     .filter((row) => row.score === topScore)
     .map((row) => row.name);
+
+  useEffect(() => {
+    if (!isComplete || (isMultiplayer && !isHost)) return;
+    trackGameCompleted("memory-match", isMultiplayer ? "multiplayer" : "single", roomId, {
+      playerCount: isMultiplayer ? Math.max(turnPlayers.length, 1) : 1,
+      pairsFound: state.matched.length / 2,
+      topScore,
+      tied: winningNames.length > 1,
+    });
+  }, [isComplete, isHost, isMultiplayer, roomId, state.matched.length, topScore, turnPlayers.length, winningNames.length]);
   const myTurn = !isMultiplayer || (player && state.currentTurnId === player.id);
   const connectionLabel = !isMultiplayer
     ? null
@@ -563,6 +590,7 @@ export function MemoryMatchGame({ roomId }: { roomId?: string }) {
     const nextRoomId = createRoomCode();
     const roomPlayer = getOrCreatePlayer();
     sessionStorage.setItem(`memory-match-room-host:${nextRoomId}`, roomPlayer.id);
+    trackRoomCreated("memory-match", nextRoomId);
     router.push(`/memory-match/room/${nextRoomId}`);
   }, [router]);
 
@@ -574,6 +602,7 @@ export function MemoryMatchGame({ roomId }: { roomId?: string }) {
   }, []);
 
   const handleStartSinglePlayer = useCallback(() => {
+    trackGameStarted("memory-match", "single", undefined, { playerCount: 1 });
     const seed = createRoomId();
     const nextState = emptyGameState();
     deckRef.current = createDeck(seed);
@@ -602,13 +631,21 @@ export function MemoryMatchGame({ roomId }: { roomId?: string }) {
   );
 
   const handleReset = useCallback(() => {
+    if (!isMultiplayer || isHost) {
+      trackRematchStarted(
+        "memory-match",
+        isMultiplayer ? "multiplayer" : "single",
+        roomId,
+        { playerCount: isMultiplayer ? Math.max(players.length, 1) : 1 },
+      );
+    }
     if (!isMultiplayer) {
       applyReset({ resetId: createRoomId(), playerName: "You" });
       setFeed([]);
       return;
     }
     publishReset().catch(() => {});
-  }, [applyReset, isMultiplayer, publishReset]);
+  }, [applyReset, isHost, isMultiplayer, players.length, publishReset, roomId]);
 
   const handleBackToMenu = useCallback(() => {
     router.push("/");
@@ -624,6 +661,12 @@ export function MemoryMatchGame({ roomId }: { roomId?: string }) {
   }, [player, players]);
   const everybodyReady =
     lobbyPlayers.length >= 2 && lobbyPlayers.every((roomPlayer) => roomPlayer.ready);
+  const handleStartRoomGame = useCallback(async () => {
+    await startRoomGame(lobbyPlayers.map((roomPlayer) => roomPlayer.id));
+    trackGameStarted("memory-match", "multiplayer", roomId, {
+      playerCount: lobbyPlayers.length,
+    });
+  }, [lobbyPlayers, roomId, startRoomGame]);
   const waitingMessage =
     lobbyPlayers.length < 2
       ? "Invite at least one more player to continue."
@@ -644,7 +687,7 @@ export function MemoryMatchGame({ roomId }: { roomId?: string }) {
         />
       </Link>
       <Link href="/" className={ui.menuLink}>
-        <span aria-hidden="true">←</span> Back to menu
+        <span aria-hidden="true"><ArrowIcon direction="left" /></span> Back to menu
       </Link>
     </header>
   );
@@ -677,7 +720,7 @@ export function MemoryMatchGame({ roomId }: { roomId?: string }) {
                 <strong>Single player</strong>
                 <small>Find all eight pairs at your own pace.</small>
               </span>
-              <span className={ui.choiceArrow} aria-hidden="true">↗</span>
+              <span className={ui.choiceArrow} aria-hidden="true"><ArrowIcon direction="up-right" /></span>
             </button>
 
             <button
@@ -693,7 +736,7 @@ export function MemoryMatchGame({ roomId }: { roomId?: string }) {
                 <strong>Multiplayer</strong>
                 <small>Take turns and compete for the most pairs.</small>
               </span>
-              <span className={ui.choiceArrow} aria-hidden="true">↗</span>
+              <span className={ui.choiceArrow} aria-hidden="true"><ArrowIcon direction="up-right" /></span>
             </button>
           </div>
 
@@ -718,7 +761,7 @@ export function MemoryMatchGame({ roomId }: { roomId?: string }) {
             className={ui.stepBack}
             onClick={() => setGateView("mode")}
           >
-            ← Change game mode
+            <ArrowIcon direction="left" /> Change game mode
           </button>
 
           <section
@@ -747,7 +790,7 @@ export function MemoryMatchGame({ roomId }: { roomId?: string }) {
                 onClick={isSingleSetup ? handleStartSinglePlayer : handleCreateRoom}
               >
                 {isSingleSetup ? "Start game" : "Create room"}
-                <span aria-hidden="true">→</span>
+                <span aria-hidden="true"><ArrowIcon /></span>
               </button>
               {!isSingleSetup && <RoomJoinForm gamePath="/memory-match" />}
             </div>
@@ -878,10 +921,10 @@ export function MemoryMatchGame({ roomId }: { roomId?: string }) {
               <button
                 type="button"
                 className={ui.startRoomAction}
-                onClick={() => startRoomGame(lobbyPlayers.map((roomPlayer) => roomPlayer.id))}
+                onClick={() => void handleStartRoomGame()}
                 disabled={!everybodyReady}
               >
-                Start game <span aria-hidden="true">→</span>
+                Start game <span aria-hidden="true"><ArrowIcon /></span>
               </button>
             ) : (
               <div className={ui.guestMessage}>
@@ -903,7 +946,7 @@ export function MemoryMatchGame({ roomId }: { roomId?: string }) {
       <header style={styles.header}>
         <div style={styles.headerLead}>
           <Link href="/" className={ui.gameMenuLink}>
-            <span aria-hidden="true">←</span> Menu
+            <span aria-hidden="true"><ArrowIcon direction="left" /></span> Menu
           </Link>
           <div>
             <p style={styles.eyebrow}>

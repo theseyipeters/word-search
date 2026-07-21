@@ -1,6 +1,7 @@
 import Image from "next/image";
 import Link from "next/link";
 import type { Metadata } from "next";
+import { ArrowIcon } from "@/components/ArrowIcon";
 import styles from "./home.module.css";
 
 export const metadata: Metadata = {
@@ -135,7 +136,7 @@ export default function Home() {
               <span className={styles.featuredLabel}>Featured game</span>
               <h2>Word Search</h2>
             </div>
-            <span className={styles.roundArrow} aria-hidden="true">↗</span>
+            <span className={styles.roundArrow} aria-hidden="true"><ArrowIcon direction="up-right" /></span>
           </div>
         </Link>
       </section> */}
@@ -173,14 +174,7 @@ export default function Home() {
               </div>
 
               <span className={styles.playLink}>
-                Play now <span aria-hidden="true"><svg xmlns="http://www.w3.org/2000/svg" width="1em" height="1em" viewBox="0 0 24 24">
-	<path d="M0 0h24v24H0z" fill="none" />
-	<g fill="none" stroke="#000" stroke-linecap="round" stroke-width="1.5">
-		<path stroke-miterlimit="10" d="M17.657 6.343L6.343 17.657" />
-		<path stroke-linejoin="round" d="M18.101 16.733V7.437A1.53 1.53 0 0 0 16.563 5.9H7.267" />
-	</g>
-</svg>
-</span>
+                Play now <span aria-hidden="true"><ArrowIcon direction="up-right" /></span>
               </span>
             </Link>
           ))}
@@ -189,17 +183,9 @@ export default function Home() {
 
       <section className={styles.inviteStrip} aria-label="How to play together">
         <p>Pick a game</p>
-        <span aria-hidden="true"><svg xmlns="http://www.w3.org/2000/svg" width="1em" height="1em" viewBox="0 0 24 24">
-	<path d="M0 0h24v24H0z" fill="none" />
-	<path fill="none" stroke="#000" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M4 12h16m0 0l-6-6m6 6l-6 6" />
-</svg>
-</span>
+        <span aria-hidden="true"><ArrowIcon /></span>
         <p>Share the room</p>
-        <span aria-hidden="true"><svg xmlns="http://www.w3.org/2000/svg" width="1em" height="1em" viewBox="0 0 24 24">
-	<path d="M0 0h24v24H0z" fill="none" />
-	<path fill="none" stroke="#000" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M4 12h16m0 0l-6-6m6 6l-6 6" />
-</svg>
-</span>
+        <span aria-hidden="true"><ArrowIcon /></span>
         <p>Play together</p>
       </section>
 

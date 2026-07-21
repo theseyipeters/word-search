@@ -1,3 +1,5 @@
+import { getBibleWords, selectBibleWords } from "@/lib/bibleWords";
+
 export type ScrambleDifficulty = "easy" | "normal" | "hard";
 
 export type ScrambleRound = {
@@ -170,13 +172,14 @@ function scramble(answer: string, random: () => number) {
 export function createScrambleRounds(
   seed: string,
   difficulty: ScrambleDifficulty,
-  count = 10
+  count = 10,
+  answers?: string[]
 ): ScrambleRound[] {
   const random = seededRandom(`${seed}:${difficulty}`);
-  return shuffle(
-    WORD_BANK.filter((entry) => entry.difficulty === difficulty),
-    random
-  )
+  const entries = answers?.length
+    ? getBibleWords(answers)
+    : selectBibleWords({ seed, difficulty, count });
+  return entries
     .slice(0, count)
     .map((entry) => ({
       answer: entry.answer,

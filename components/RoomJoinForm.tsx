@@ -2,6 +2,7 @@
 
 import { useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
+import { ArrowIcon } from "./ArrowIcon";
 import ui from "./RoomJoinForm.module.css";
 
 type RoomJoinFormProps = {
@@ -46,7 +47,7 @@ export function RoomJoinForm({ gamePath }: RoomJoinFormProps) {
             aria-describedby={showError ? `room-error-${gamePath.replaceAll("/", "-")}` : undefined}
           />
           <button type="submit" disabled={roomCode.length !== 4}>
-            Join room <span aria-hidden="true">→</span>
+            Join room <span aria-hidden="true"><ArrowIcon /></span>
           </button>
         </div>
         {showError && (
