@@ -26,6 +26,7 @@ import {
   trackRoomJoined,
 } from "@/lib/gameTelemetry";
 import { ArrowIcon } from "./ArrowIcon";
+import { FinalStandings } from "./FinalPosition";
 import { RoomJoinForm } from "./RoomJoinForm";
 import shell from "./TriviaBattleGame.module.css";
 import ui from "./WordScrambleRaceGame.module.css";
@@ -1231,11 +1232,12 @@ export function WordScrambleRaceGame({ roomId }: { roomId?: string }) {
                   ? `You unscrambled your way to ${topScore} points.`
                   : `${winnerName} unscrambled their way to ${topScore} points.`}
             </p>
-            <div className={ui.finalScores}>
-              {sortedScores.slice(0, 3).map((row, index) => (
-                <div key={row.id}><span>#{index + 1} {row.name}</span><strong>{row.score}</strong></div>
-              ))}
-            </div>
+            {isMultiplayer ? (
+              <FinalStandings
+                rows={sortedScores}
+                currentPlayerId={myPlayerId}
+              />
+            ) : null}
             <div className={ui.modalActions}>
               {(!isMultiplayer || isHost) ? (
                 <button type="button" className={ui.primaryModalAction} onClick={handleNewRace}>

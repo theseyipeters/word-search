@@ -17,6 +17,7 @@ import {
   trackRoomJoined,
 } from "@/lib/gameTelemetry";
 import { ArrowIcon } from "./ArrowIcon";
+import { FinalStandings } from "./FinalPosition";
 import { RoomJoinForm } from "./RoomJoinForm";
 import ui from "./TicTacToeGame.module.css";
 
@@ -509,6 +510,20 @@ export function TicTacToeGame({ roomId }: { roomId?: string }) {
   const isMyTurn = !isMultiplayer || mySymbol === turn;
   const playerX = players.find((roomPlayer) => assignments.get(roomPlayer.id) === "X");
   const playerO = players.find((roomPlayer) => assignments.get(roomPlayer.id) === "O");
+  const finalMatchRows = startEvent
+    ? [
+        {
+          id: startEvent.playerXId,
+          name: playerX?.name || (player?.id === startEvent.playerXId ? player.name : "Player X"),
+          score: displayScores.X,
+        },
+        {
+          id: startEvent.playerOId,
+          name: playerO?.name || (player?.id === startEvent.playerOId ? player.name : "Player O"),
+          score: displayScores.O,
+        },
+      ]
+    : [];
   const connectionLabel = !isMultiplayer
     ? null
     : error
@@ -1098,6 +1113,13 @@ export function TicTacToeGame({ roomId }: { roomId?: string }) {
               <span>Draws <strong>{displayScores.draws}</strong></span>
               <span>O <strong>{displayScores.O}</strong></span>
             </div>
+            {isMultiplayer && isMatchComplete ? (
+              <FinalStandings
+                rows={finalMatchRows}
+                currentPlayerId={player?.id}
+                scoreLabel={(score) => score === 1 ? "win" : "wins"}
+              />
+            ) : null}
             <div style={styles.modalActions}>
               <button onClick={handleReset} style={styles.primaryBtn}>
                 {isMatchComplete
@@ -1243,7 +1265,7 @@ const styles: Record<string, React.CSSProperties> = {
   },
   gameArea: {
     display: "flex",
-    justifyContent: "center",
+    justifyContent: "safe center",
     alignItems: "flex-start",
     gap: "32px",
     flexWrap: "wrap",
@@ -1438,9 +1460,11 @@ const styles: Record<string, React.CSSProperties> = {
     zIndex: 100,
   },
   modal: {
-    width: "min(100%, 360px)",
-    padding: "28px",
-    borderRadius: "24px",
+    width: "min(100%, 580px)",
+    maxHeight: "calc(100dvh - 48px)",
+    overflowY: "auto",
+    padding: "clamp(28px, 5vw, 48px)",
+    borderRadius: "28px",
     border: "1px solid var(--border)",
     background: "var(--bg-secondary)",
     boxShadow: "0 24px 48px var(--shadow)",

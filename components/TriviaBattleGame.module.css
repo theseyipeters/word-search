@@ -219,7 +219,7 @@
   margin-top: 30px;
   display: flex;
   align-items: center;
-  justify-content: center;
+  justify-content: safe center;
   gap: 8px;
   color: #90938c;
   font-size: 0.7rem;
@@ -1193,8 +1193,10 @@
 }
 
 .modal {
-  width: min(100%, 440px);
-  padding: 32px;
+  width: min(100%, 600px);
+  max-height: calc(100dvh - 48px);
+  padding: clamp(30px, 5vw, 48px);
+  overflow-y: auto;
   border: 1px solid var(--border);
   border-radius: 28px;
   background: var(--bg-secondary);

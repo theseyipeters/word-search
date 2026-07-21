@@ -13,7 +13,7 @@
   margin: 42px auto 34px;
   display: flex;
   align-items: center;
-  justify-content: center;
+  justify-content: safe center;
   gap: 6px;
   transform: rotate(-3deg);
 }
@@ -665,7 +665,9 @@
 }
 
 .modal {
-  width: min(100%, 540px);
+  width: min(100%, 620px);
+  max-height: calc(100dvh - 40px);
+  overflow-y: auto;
   padding: clamp(28px, 6vw, 48px);
   border: 1px solid var(--border);
   border-radius: 28px;
