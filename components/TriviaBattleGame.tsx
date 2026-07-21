@@ -7,6 +7,14 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { createRoomCode, createRoomId } from "@/lib/useWordSearch";
 import { useTheme } from "@/lib/useTheme";
+import {
+  trackGameCompleted,
+  trackGameStarted,
+  trackGameView,
+  trackRematchStarted,
+  trackRoomCreated,
+  trackRoomJoined,
+} from "@/lib/gameTelemetry";
 import { ArrowIcon } from "./ArrowIcon";
 import { RoomJoinForm } from "./RoomJoinForm";
 import ui from "./TriviaBattleGame.module.css";
@@ -469,6 +477,14 @@ export function TriviaBattleGame({ roomId }: { roomId?: string }) {
     updateReady,
   } = useTriviaRoom(roomId, applyAnswer, applyAdvance, applyReset, applyStart);
 
+  useEffect(() => {
+    trackGameView("trivia-battle", roomId);
+  }, [roomId]);
+
+  useEffect(() => {
+    if (roomId && player) trackRoomJoined("trivia-battle", roomId, isHost);
+  }, [isHost, player, roomId]);
+
   const activeBattle = !isMultiplayer
     ? gateView === "playing"
     : Boolean(startEvent);
@@ -605,6 +621,17 @@ export function TriviaBattleGame({ roomId }: { roomId?: string }) {
   const winners = sortedScores.filter((row) => row.score === topScore);
   const winnerName = winners[0]?.name || "You";
   const winnerIsYou = !isMultiplayer || winnerName.trim().toLowerCase() === "you";
+
+  useEffect(() => {
+    if (!isComplete || (isMultiplayer && !isHost)) return;
+    trackGameCompleted("trivia-battle", isMultiplayer ? "multiplayer" : "single", roomId, {
+      playerCount: isMultiplayer ? Math.max(battlePlayers.length, 1) : 1,
+      difficulty,
+      questionsAnswered: questions.length,
+      topScore,
+      tied: winners.length > 1,
+    });
+  }, [battlePlayers.length, difficulty, isComplete, isHost, isMultiplayer, questions.length, roomId, topScore, winners.length]);
   const connectionLabel = !isMultiplayer
     ? null
     : error
@@ -617,6 +644,7 @@ export function TriviaBattleGame({ roomId }: { roomId?: string }) {
     const nextRoomId = createRoomCode();
     const roomPlayer = getOrCreatePlayer();
     sessionStorage.setItem(`trivia-battle-room-host:${nextRoomId}`, roomPlayer.id);
+    trackRoomCreated("trivia-battle", nextRoomId);
     router.push(`/trivia-battle/room/${nextRoomId}?difficulty=${difficulty}`);
   }, [difficulty, router]);
 
@@ -628,6 +656,10 @@ export function TriviaBattleGame({ roomId }: { roomId?: string }) {
   }, []);
 
   const handleStartSinglePlayer = useCallback(() => {
+    trackGameStarted("trivia-battle", "single", undefined, {
+      playerCount: 1,
+      difficulty,
+    });
     setGameId(createRoomId());
     setQuestions([]);
     setQuestionIndex(0);
@@ -636,7 +668,7 @@ export function TriviaBattleGame({ roomId }: { roomId?: string }) {
     setScores({});
     setFeed([]);
     setGateView("playing");
-  }, []);
+  }, [difficulty]);
 
   const handleAnswer = useCallback(
     (selectedIndex: number) => {
@@ -675,12 +707,23 @@ export function TriviaBattleGame({ roomId }: { roomId?: string }) {
   }, [isHost, isMultiplayer, publishAdvance, questionIndex, questions.length]);
 
   const handleReset = useCallback(() => {
+    if (!isMultiplayer || isHost) {
+      trackRematchStarted(
+        "trivia-battle",
+        isMultiplayer ? "multiplayer" : "single",
+        roomId,
+        {
+          playerCount: isMultiplayer ? Math.max(battlePlayers.length, 1) : 1,
+          difficulty,
+        },
+      );
+    }
     if (!isMultiplayer) {
       applyReset({ resetId: createRoomId(), playerName: "You" });
       return;
     }
     if (isHost) publishReset().catch(() => {});
-  }, [applyReset, isHost, isMultiplayer, publishReset]);
+  }, [applyReset, battlePlayers.length, difficulty, isHost, isMultiplayer, publishReset, roomId]);
 
   const lobbyPlayers = useMemo(() => {
     const byId = new Map(players.map((roomPlayer) => [roomPlayer.id, roomPlayer]));
@@ -692,6 +735,13 @@ export function TriviaBattleGame({ roomId }: { roomId?: string }) {
   }, [player, players]);
   const everybodyReady =
     lobbyPlayers.length >= 2 && lobbyPlayers.every((roomPlayer) => roomPlayer.ready);
+  const handleStartRoomGame = useCallback(async () => {
+    await startRoomGame(difficulty, lobbyPlayers.map((roomPlayer) => roomPlayer.id));
+    trackGameStarted("trivia-battle", "multiplayer", roomId, {
+      playerCount: lobbyPlayers.length,
+      difficulty,
+    });
+  }, [difficulty, lobbyPlayers, roomId, startRoomGame]);
   const waitingMessage =
     lobbyPlayers.length < 2
       ? "Invite at least one more player to continue."
@@ -943,7 +993,7 @@ export function TriviaBattleGame({ roomId }: { roomId?: string }) {
               <button
                 type="button"
                 className={ui.startRoomAction}
-                onClick={() => startRoomGame(difficulty, lobbyPlayers.map((roomPlayer) => roomPlayer.id))}
+                onClick={() => void handleStartRoomGame()}
                 disabled={!everybodyReady}
               >
                 Start battle <span aria-hidden="true"><ArrowIcon /></span>

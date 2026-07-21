@@ -9,11 +9,21 @@ import { useRouter } from "next/navigation";
 import {
   createRoomCode,
   GRID_SIZE,
+  WORDS_PER_GAME,
   useWordSearch,
   type Position,
 } from "@/lib/useWordSearch";
 import { useTheme } from "@/lib/useTheme";
 import { useTimer } from "@/lib/useTimer";
+import {
+  trackGameCompleted,
+  trackGameStarted,
+  trackGameView,
+  trackRematchStarted,
+  trackRoomCreated,
+  trackRoomJoined,
+} from "@/lib/gameTelemetry";
+import { takeBibleWordCycle } from "@/lib/bibleWords";
 import { ArrowIcon } from "./ArrowIcon";
 import { RoomJoinForm } from "./RoomJoinForm";
 import ui from "./WordSearchGame.module.css";
@@ -95,7 +105,7 @@ function useAblyRoom(
   const [connectionState, setConnectionState] = useState("idle");
   const [error, setError] = useState<string | null>(null);
   const [isHost, setIsHost] = useState(false);
-  const [gameStarted, setGameStarted] = useState(false);
+  const [gameWords, setGameWords] = useState<string[] | null>(null);
 
   useEffect(() => {
     if (!roomId) return;
@@ -121,7 +131,14 @@ function useAblyRoom(
     let mounted = true;
     const handleRoomMessage = (message: Ably.Types.Message) => {
       if (message.name === "game-started") {
-        if (mounted) setGameStarted(true);
+        const data = message.data as { wordAnswers?: unknown };
+        if (
+          mounted &&
+          Array.isArray(data.wordAnswers) &&
+          data.wordAnswers.every((answer) => typeof answer === "string")
+        ) {
+          setGameWords(data.wordAnswers);
+        }
         return;
       }
 
@@ -242,16 +259,19 @@ function useAblyRoom(
     [channel, player]
   );
 
-  const startRoomGame = useCallback(async () => {
+  const startRoomGame = useCallback(async (wordAnswers: string[]) => {
     if (!channel || !isHost) return;
-    await channel.publish("game-started", { startedAt: Date.now() });
-    setGameStarted(true);
+    await channel.publish("game-started", {
+      startedAt: Date.now(),
+      wordAnswers,
+    });
+    setGameWords(wordAnswers);
   }, [channel, isHost]);
 
   return {
     connectionState,
     error,
-    gameStarted,
+    gameWords,
     isHost,
     player,
     players,
@@ -290,7 +310,7 @@ export function WordSearchGame({ roomId }: WordSearchGameProps) {
   const {
     connectionState,
     error,
-    gameStarted: roomGameStarted,
+    gameWords: roomGameWords,
     isHost,
     player,
     players,
@@ -299,6 +319,14 @@ export function WordSearchGame({ roomId }: WordSearchGameProps) {
     updatePlayerName,
     updateReady,
   } = useAblyRoom(roomId, handleRemoteFoundWord);
+
+  useEffect(() => {
+    trackGameView("word-search", roomId);
+  }, [roomId]);
+
+  useEffect(() => {
+    if (roomId && player) trackRoomJoined("word-search", roomId, isHost);
+  }, [isHost, player, roomId]);
 
   const {
     grid,
@@ -335,9 +363,24 @@ export function WordSearchGame({ roomId }: WordSearchGameProps) {
   });
 
   const hasGameStarted = isMultiplayer
-    ? roomGameStarted
+    ? Boolean(roomGameWords)
     : gateView === "playing";
   const { formatted, reset } = useTimer(isComplete, !hasGameStarted);
+
+  useEffect(() => {
+    if (!roomGameWords) return;
+    newGame(roomGameWords, `${roomId}:${roomGameWords.join(":")}`);
+    reset();
+  }, [newGame, reset, roomGameWords, roomId]);
+
+  useEffect(() => {
+    if (!isComplete || (isMultiplayer && !isHost)) return;
+    trackGameCompleted("word-search", isMultiplayer ? "multiplayer" : "single", roomId, {
+      playerCount: isMultiplayer ? Math.max(players.length, 1) : 1,
+      wordsFound: foundWords.size,
+      wordsTotal: placed.length,
+    });
+  }, [foundWords.size, isComplete, isHost, isMultiplayer, placed.length, players.length, roomId]);
 
   useEffect(() => {
     roomPublishRef.current = publishFoundWord;
@@ -363,9 +406,13 @@ export function WordSearchGame({ roomId }: WordSearchGameProps) {
       const nextRoomId = createRoomCode();
       const roomPlayer = getOrCreatePlayer();
       sessionStorage.setItem(`word-search-room-host:${nextRoomId}`, roomPlayer.id);
+      trackRoomCreated("word-search", nextRoomId);
       router.push(`/word-search/room/${nextRoomId}`);
       return;
     }
+    trackRematchStarted("word-search", "single", undefined, {
+      playerCount: 1,
+    });
     newGame();
     reset();
   }, [isMultiplayer, newGame, reset, router]);
@@ -374,6 +421,7 @@ export function WordSearchGame({ roomId }: WordSearchGameProps) {
     const nextRoomId = createRoomCode();
     const roomPlayer = getOrCreatePlayer();
     sessionStorage.setItem(`word-search-room-host:${nextRoomId}`, roomPlayer.id);
+    trackRoomCreated("word-search", nextRoomId);
     router.push(`/word-search/room/${nextRoomId}`);
   }, [router]);
 
@@ -385,10 +433,25 @@ export function WordSearchGame({ roomId }: WordSearchGameProps) {
   }, [inviteUrl]);
 
   const handleStartSinglePlayer = useCallback(() => {
+    trackGameStarted("word-search", "single", undefined, { playerCount: 1 });
     newGame();
     reset();
     setGateView("playing");
   }, [newGame, reset]);
+
+  const handleStartRoomGame = useCallback(async () => {
+    const nextSeed = createRoomCode();
+    const nextWords = takeBibleWordCycle({
+      game: "word-search",
+      seed: nextSeed,
+      count: WORDS_PER_GAME,
+      maxLength: GRID_SIZE,
+    });
+    await startRoomGame(nextWords.map((entry) => entry.answer));
+    trackGameStarted("word-search", "multiplayer", roomId, {
+      playerCount: Math.max(players.length, 1),
+    });
+  }, [players.length, roomId, startRoomGame]);
 
   const handleMouseDown = useCallback(
     (e: React.MouseEvent) => {
@@ -633,7 +696,7 @@ export function WordSearchGame({ roomId }: WordSearchGameProps) {
     );
   }
 
-  if (isMultiplayer && !roomGameStarted) {
+  if (isMultiplayer && !roomGameWords) {
     return (
       <div className={ui.gatePage}>
         {gateNavigation}
@@ -736,7 +799,7 @@ export function WordSearchGame({ roomId }: WordSearchGameProps) {
               <button
                 type="button"
                 className={ui.startRoomAction}
-                onClick={startRoomGame}
+                onClick={() => void handleStartRoomGame()}
                 disabled={!everybodyReady}
               >
                 Start game <span aria-hidden="true"><ArrowIcon /></span>
