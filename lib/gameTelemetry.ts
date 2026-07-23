@@ -5,6 +5,7 @@ export const GAME_KEYS = [
   "trivia-battle",
   "connect-four",
   "word-scramble",
+  "wordbound",
 ] as const;
 
 export type GameKey = (typeof GAME_KEYS)[number];

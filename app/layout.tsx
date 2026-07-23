@@ -1,17 +1,20 @@
 import type { Metadata, Viewport } from "next";
-import { Jost, Oxygen } from "next/font/google";
+import localFont from "next/font/local";
 import { PwaRegistrar } from "@/components/PwaRegistrar";
 import "./globals.css";
 
-const jost = Jost({
-  subsets: ["latin"],
+const jost = localFont({
+  src: "../public/social/Oxygen-Bold.woff2",
   variable: "--font-jost",
+  weight: "700",
+  display: "swap",
 });
 
-const oxygen = Oxygen({
-  subsets: ["latin"], 
-  weight:"700",
-  variable:"--font-oxygen"
+const oxygen = localFont({
+  src: "../public/social/Oxygen-Bold.woff2",
+  variable: "--font-oxygen",
+  weight: "700",
+  display: "swap",
 });
 
 const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000";
@@ -23,7 +26,7 @@ export const metadata: Metadata = {
     template: "%s | Bible Games Hub",
   },
   description:
-    "Play Bible-inspired games together, including Word Search, Tic Tac Toe, Memory Match, Trivia Battle, Connect Four, and Word Scramble Race.",
+    "Play fast multiplayer games together, including Word Search, Trivia Battle, Connect Four, Word Scramble Race, and Wordbound.",
   applicationName: "Bible Games Hub",
   keywords: [
     "Bible games",
@@ -34,6 +37,8 @@ export const metadata: Metadata = {
     "memory match",
     "connect four",
     "word scramble",
+    "word game",
+    "wordbound",
     "party games",
   ],
   authors: [{ name: "Bible Games Hub" }],
@@ -42,7 +47,7 @@ export const metadata: Metadata = {
   openGraph: {
     title: "Bible Games Hub",
     description:
-      "Play Bible-inspired games together, including Word Search, Tic Tac Toe, Memory Match, Trivia Battle, Connect Four, and Word Scramble Race.",
+      "Play fast multiplayer games together, including Word Search, Trivia Battle, Connect Four, Word Scramble Race, and Wordbound.",
     type: "website",
     siteName: "Bible Games Hub",
     images: [
@@ -58,7 +63,7 @@ export const metadata: Metadata = {
     card: "summary_large_image",
     title: "Bible Games Hub",
     description:
-      "Play Bible-inspired games together, including Word Search, Tic Tac Toe, Memory Match, Trivia Battle, Connect Four, and Word Scramble Race.",
+      "Play fast multiplayer games together, including Word Search, Trivia Battle, Connect Four, Word Scramble Race, and Wordbound.",
     images: ["/og.png"],
   },
   manifest: "/manifest.webmanifest",
