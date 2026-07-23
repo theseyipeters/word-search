@@ -27,6 +27,7 @@ export async function GET(request: NextRequest) {
       "trivia-battle:*": ["publish", "subscribe", "presence"],
       "connect-four:*": ["publish", "subscribe", "presence"],
       "word-scramble:*": ["publish", "subscribe", "presence"],
+      "wordbound:*": ["publish", "subscribe", "presence"],
     }),
   });
 

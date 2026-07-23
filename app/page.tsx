@@ -65,6 +65,15 @@ const games = [
     tone: "mint",
     description: "Rearrange Bible words quickly and race to the top score.",
   },
+  {
+    number: "07",
+    title: "Wordbound",
+    href: "/wordbound",
+    status: "2-player word race",
+    art: ["T", "·", "·", "F"],
+    tone: "butter",
+    description: "Choose the bookend letters and race to connect them with a real word.",
+  },
 ] as const;
 
 const previewLetters = [
@@ -91,7 +100,7 @@ export default function Home() {
         </Link>
         <div className={styles.navMeta}>
           <span className={styles.liveDot} aria-hidden="true" />
-          <span>6 games ready to play</span>
+          <span>7 games ready to play</span>
         </div>
       </header>
 
